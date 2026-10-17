@@ -157,7 +157,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Version 1.0.0 • Open Source License\nCrafted with pride by Sami",
+                    text = "Version 1.1.0 • Open Source License\nCrafted with pride by Sami",
                     fontSize = 11.sp,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
