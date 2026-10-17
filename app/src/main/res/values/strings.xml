@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">RDS SCANNER</string>
+    <string name="app_tagline">Smart Document Scanner, OCR &amp; PDF Maker</string>
+    <string name="developed_by">Develop by Sami</string>
+    <string name="developer_name">Sami</string>
+    <string name="app_version">1.0.0 Open Source</string>
+</resources>
