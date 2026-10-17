@@ -89,10 +89,10 @@ struct PdfReaderHubView: View {
                             .background(Color(uiColor: .secondarySystemGroupedBackground))
                             .cornerRadius(12)
                     } else {
-                        ForEach(storage.documents) { doc in
+                        ForEach(storage.documents, id: \.id) { doc in
                             Button(action: {
                                 let images = doc.pages.compactMap { storage.loadImage(named: $0.enhancedFileName) }
-                                if let url = PDFManager.shared.generatePDF(from: images, title: doc.title) {
+                                if let url = PDFManager.shared.generatePDF(from: images, title: doc.name) {
                                     selectedPdfURL = url
                                     showReader = true
                                 }
@@ -106,7 +106,7 @@ struct PdfReaderHubView: View {
                                         .clipShape(RoundedRectangle(cornerRadius: 10))
 
                                     VStack(alignment: .leading, spacing: 3) {
-                                        Text(doc.title)
+                                        Text(doc.name)
                                             .font(.headline)
                                             .foregroundColor(.primary)
                                         Text("\(doc.pages.count) pages")
