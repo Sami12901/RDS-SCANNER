@@ -35,7 +35,7 @@ public struct MainTabView: View {
 
 /// Hub 3: PDF Reader Launcher & Recent Documents
 struct PdfReaderHubView: View {
-    @ObservedObject private var storage = DocumentStorage.shared
+    @ObservedObject private var storage = DocumentStorageManager.shared
     @State private var showPicker = false
     @State private var selectedPdfURL: URL?
     @State private var showReader = false
@@ -91,7 +91,8 @@ struct PdfReaderHubView: View {
                     } else {
                         ForEach(storage.documents) { doc in
                             Button(action: {
-                                if let url = storage.exportPDF(for: doc) {
+                                let images = doc.pages.compactMap { storage.loadImage(named: $0.enhancedFileName) }
+                                if let url = PDFManager.shared.generatePDF(from: images, title: doc.title) {
                                     selectedPdfURL = url
                                     showReader = true
                                 }

@@ -7,7 +7,7 @@ public struct PdfReaderView: View {
     public let title: String?
 
     @Environment(\.dismiss) private var dismiss
-    @State private var isNightMode: BooleanLiteralType = false
+    @State private var isNightMode: Bool = false
     @State private var showShareSheet = false
     @State private var activeTool: AcrobatTool = .view
     @State private var pdfDoc: PDFDocument?
