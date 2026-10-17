@@ -29,11 +29,15 @@ Get the latest release for your phone:
   <a href="https://github.com/Sami12901/RDS-SCANNER/releases/download/v1.3.0/RDS-SCANNER-v1.3.0.apk">
     <img src="https://img.shields.io/badge/Download_Android_APK-v1.3.0_(23.3_MB)-00A86B?style=for-the-badge&logo=android&logoColor=white" alt="Download Android APK" />
   </a>
+  &nbsp;&nbsp;
+  <a href="https://github.com/Sami12901/RDS-SCANNER/releases/download/v1.3.0/RDSScanner-v1.3.0.ipa">
+    <img src="https://img.shields.io/badge/Download_iPhone_IPA-v1.3.0_(iOS_16+)-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download iPhone IPA" />
+  </a>
 </p>
 
-> 🍏 **iPhone Users**: Download the native iOS package `RDSScanner-iOS-v1.3.0.zip` from the **[Releases Page](https://github.com/Sami12901/RDS-SCANNER/releases)** and run with Xcode, or install via TestFlight / Sideloadly.
+> 🍏 **How to Install on iPhone**: Download **`RDSScanner-v1.3.0.ipa`** and install with **[Sideloadly](https://sideloadly.io/)**, **[AltStore](https://altstore.io/)**, **TrollStore**, or **Scarlet** (no jailbreak required). Or build the source project in Xcode with `RDSScanner-iOS-v1.3.0.zip`.
 
-> Or view all release files on the **[Releases Page](https://github.com/Sami12901/RDS-SCANNER/releases)**.
+> View all release files on the **[Releases Page](https://github.com/Sami12901/RDS-SCANNER/releases)**.
 
 ---
 
