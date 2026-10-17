@@ -8,3 +8,16 @@ data object HomeKey : NavKey
 
 @Serializable
 data class DetailKey(val documentId: String) : NavKey
+
+@Serializable
+data class CameraScanKey(val modeName: String = "DOCS") : NavKey
+
+@Serializable
+data class CropKey(val imagePath: String, val modeName: String = "DOCS") : NavKey
+
+@Serializable
+data class IdCardWorkflowKey(
+    val frontPath: String,
+    val backPath: String? = null,
+    val isPassport: Boolean = false
+) : NavKey

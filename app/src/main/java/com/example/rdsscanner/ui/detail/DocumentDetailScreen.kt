@@ -5,7 +5,6 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
-import android.graphics.Paint
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -25,22 +24,28 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.BorderColor
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Filter
 import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.RotateRight
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -50,19 +55,26 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,16 +94,23 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.example.rdsscanner.data.DocumentRepository
+import com.example.rdsscanner.model.PdfCompression
+import com.example.rdsscanner.model.PdfPageSize
+import com.example.rdsscanner.model.PdfSettings
+import com.example.rdsscanner.model.ScanFilter
+import com.example.rdsscanner.model.ScanPage
 import com.example.rdsscanner.model.ScannedDocument
 import com.example.rdsscanner.scanner.ImageProcessor
 import com.example.rdsscanner.scanner.OcrHelper
 import com.example.rdsscanner.scanner.PdfGenerator
-import com.example.rdsscanner.scanner.ScanFilter
 import com.example.rdsscanner.theme.EmeraldPrimary
 import com.example.rdsscanner.ui.ocr.OcrResultDialog
 import com.example.rdsscanner.ui.signature.SignatureDialog
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -109,14 +128,27 @@ fun DocumentDetailScreen(
     var showRenameDialog by remember { mutableStateOf(false) }
     var newTitle by remember { mutableStateOf(doc?.title ?: "") }
 
+    var showAdjustSheet by remember { mutableStateOf(false) }
+    var showPdfSettingsSheet by remember { mutableStateOf(false) }
+
     var showOcrDialog by remember { mutableStateOf(false) }
     var ocrResultText by remember { mutableStateOf("") }
     var isOcrRunning by remember { mutableStateOf(false) }
 
     var showSignatureDialog by remember { mutableStateOf(false) }
     var isGeneratingPdf by remember { mutableStateOf(false) }
+    var isFilterApplying by remember { mutableStateOf(false) }
 
-    // Reload doc on changes
+    // Adjust sliders
+    var brightnessVal by remember { mutableFloatStateOf(0f) }
+    var contrastVal by remember { mutableFloatStateOf(1f) }
+
+    // PDF custom settings
+    var pdfPageSize by remember { mutableStateOf(PdfPageSize.A4) }
+    var pdfCompression by remember { mutableStateOf(PdfCompression.MEDIUM) }
+    var pdfPageNumbering by remember { mutableStateOf(true) }
+    var pdfWatermarkText by remember { mutableStateOf("") }
+
     fun refreshDoc() {
         doc = repository.getDocumentById(documentId)
         if (doc == null || doc?.pages?.isEmpty() == true) {
@@ -154,12 +186,7 @@ fun DocumentDetailScreen(
                                     maxLines = 1
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Rename",
-                                    modifier = Modifier.size(14.dp),
-                                    tint = EmeraldPrimary
-                                )
+                                Icon(Icons.Default.Edit, contentDescription = "Rename", modifier = Modifier.size(14.dp), tint = EmeraldPrimary)
                             }
                             Text(
                                 text = "${currentDocument.pageCount} pages • Developed by Sami",
@@ -171,10 +198,16 @@ fun DocumentDetailScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
+                    // PDF Settings Button
+                    IconButton(onClick = { showPdfSettingsSheet = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = "PDF Settings", tint = EmeraldPrimary)
+                    }
+
+                    // Share PDF
                     IconButton(
                         onClick = {
                             isGeneratingPdf = true
@@ -184,13 +217,8 @@ fun DocumentDetailScreen(
                                 isGeneratingPdf = false
 
                                 result.onSuccess { pdfFile ->
-                                    val uri = FileProvider.getUriForFile(
-                                        context,
-                                        "${context.packageName}.fileprovider",
-                                        pdfFile
-                                    )
-                                    val sendIntent = Intent().apply {
-                                        action = Intent.ACTION_SEND
+                                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
+                                    val sendIntent = Intent(Intent.ACTION_SEND).apply {
                                         putExtra(Intent.EXTRA_STREAM, uri)
                                         type = "application/pdf"
                                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -202,9 +230,10 @@ fun DocumentDetailScreen(
                             }
                         }
                     ) {
-                        Icon(imageVector = Icons.Default.Share, contentDescription = "Share PDF", tint = EmeraldPrimary)
+                        Icon(Icons.Default.Share, contentDescription = "Share PDF", tint = EmeraldPrimary)
                     }
 
+                    // Delete Doc
                     IconButton(
                         onClick = {
                             coroutineScope.launch {
@@ -213,12 +242,10 @@ fun DocumentDetailScreen(
                             }
                         }
                     ) {
-                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete Doc", tint = MaterialTheme.colorScheme.error)
+                        Icon(Icons.Default.Delete, contentDescription = "Delete Doc", tint = MaterialTheme.colorScheme.error)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
         bottomBar = {
@@ -227,13 +254,63 @@ fun DocumentDetailScreen(
                 shadowElevation = 8.dp
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    // Page Actions Toolbar
+                    // Filters Row
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(ScanFilter.values()) { filter ->
+                            val isSelected = currentPage?.filter == filter
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    if (currentPage != null && !isFilterApplying) {
+                                        isFilterApplying = true
+                                        coroutineScope.launch {
+                                            val pageFile = File(currentPage.imagePath)
+                                            val originalFile = File(currentPage.originalPath)
+                                            val fileToProcess = if (originalFile.exists()) originalFile else pageFile
+                                            val baseBmp = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(fileToProcess.absolutePath) }
+
+                                            if (baseBmp != null) {
+                                                val filtered = ImageProcessor.applyFilter(baseBmp, filter)
+                                                ImageProcessor.saveBitmapToFile(filtered, pageFile, quality = 95)
+
+                                                val updatedPages = currentDocument.pages.map { p ->
+                                                    if (p.id == currentPage.id) p.copy(filter = filter) else p
+                                                }
+                                                repository.saveDocument(currentDocument.copy(pages = updatedPages))
+                                                refreshDoc()
+                                            }
+                                            isFilterApplying = false
+                                        }
+                                    }
+                                },
+                                label = { Text(filter.displayName, fontSize = 11.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = EmeraldPrimary.copy(alpha = 0.2f),
+                                    selectedLabelColor = EmeraldPrimary
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Toolbar actions
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceAround,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Rotate Action
+                        // Adjust Sliders
+                        ActionItem(
+                            icon = Icons.Default.Tune,
+                            label = "Adjust",
+                            onClick = { showAdjustSheet = true }
+                        )
+
+                        // Rotate
                         ActionItem(
                             icon = Icons.Default.RotateRight,
                             label = "Rotate",
@@ -247,7 +324,7 @@ fun DocumentDetailScreen(
                             }
                         )
 
-                        // OCR Action
+                        // OCR
                         ActionItem(
                             icon = Icons.Default.TextFields,
                             label = "OCR (Text)",
@@ -269,17 +346,53 @@ fun DocumentDetailScreen(
                             }
                         )
 
-                        // Signature Action
+                        // Sign
                         ActionItem(
                             icon = Icons.Default.Draw,
                             label = "Signature",
                             onClick = { showSignatureDialog = true }
                         )
 
+                        // Reorder Page Left
+                        ActionItem(
+                            icon = Icons.Default.ArrowBack,
+                            label = "Move Left",
+                            onClick = {
+                                if (selectedPageIndex > 0) {
+                                    val pages = currentDocument.pages.toMutableList()
+                                    val item = pages.removeAt(selectedPageIndex)
+                                    pages.add(selectedPageIndex - 1, item)
+                                    coroutineScope.launch {
+                                        repository.saveDocument(currentDocument.copy(pages = pages))
+                                        selectedPageIndex--
+                                        refreshDoc()
+                                    }
+                                }
+                            }
+                        )
+
+                        // Reorder Page Right
+                        ActionItem(
+                            icon = Icons.Default.ArrowForward,
+                            label = "Move Right",
+                            onClick = {
+                                if (selectedPageIndex < currentDocument.pages.size - 1) {
+                                    val pages = currentDocument.pages.toMutableList()
+                                    val item = pages.removeAt(selectedPageIndex)
+                                    pages.add(selectedPageIndex + 1, item)
+                                    coroutineScope.launch {
+                                        repository.saveDocument(currentDocument.copy(pages = pages))
+                                        selectedPageIndex++
+                                        refreshDoc()
+                                    }
+                                }
+                            }
+                        )
+
                         // Delete Page
                         ActionItem(
                             icon = Icons.Default.Delete,
-                            label = "Delete Page",
+                            label = "Delete",
                             isDestructive = true,
                             onClick = {
                                 if (currentPage != null) {
@@ -300,30 +413,23 @@ fun DocumentDetailScreen(
                             isGeneratingPdf = true
                             coroutineScope.launch {
                                 val outputFile = repository.getOutputPdfFile(currentDocument)
-                                val result = PdfGenerator.generatePdf(context, currentDocument, outputFile)
+                                val customSettings = PdfSettings(
+                                    pageSize = pdfPageSize,
+                                    compression = pdfCompression,
+                                    includePageNumbers = pdfPageNumbering,
+                                    watermarkText = if (pdfWatermarkText.isNotBlank()) pdfWatermarkText else null
+                                )
+                                val result = PdfGenerator.generatePdf(context, currentDocument, outputFile, customSettings)
                                 isGeneratingPdf = false
 
                                 result.onSuccess { pdfFile ->
-                                    val uri = FileProvider.getUriForFile(
-                                        context,
-                                        "${context.packageName}.fileprovider",
-                                        pdfFile
-                                    )
-                                    val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-                                        setDataAndType(uri, "application/pdf")
+                                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
+                                    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        type = "application/pdf"
                                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                     }
-                                    try {
-                                        context.startActivity(viewIntent)
-                                    } catch (e: Exception) {
-                                        // Fallback to share
-                                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                                            putExtra(Intent.EXTRA_STREAM, uri)
-                                            type = "application/pdf"
-                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        }
-                                        context.startActivity(Intent.createChooser(sendIntent, "Open / Share PDF"))
-                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, "Open / Share PDF"))
                                 }.onFailure {
                                     Toast.makeText(context, "PDF compilation failed", Toast.LENGTH_SHORT).show()
                                 }
@@ -338,7 +444,7 @@ fun DocumentDetailScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Compiling PDF...", color = Color.White)
                         } else {
-                            Icon(imageVector = Icons.Default.PictureAsPdf, contentDescription = null, tint = Color.White)
+                            Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color.White)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Export Clean PDF (No Watermark)", color = Color.White, fontWeight = FontWeight.Bold)
                         }
@@ -364,8 +470,7 @@ fun DocumentDetailScreen(
             ) {
                 if (currentPage != null) {
                     Card(
-                        modifier = Modifier
-                            .fillMaxSize(),
+                        modifier = Modifier.fillMaxSize(),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                         shape = RoundedCornerShape(12.dp)
@@ -387,7 +492,7 @@ fun DocumentDetailScreen(
                                     .align(Alignment.BottomCenter)
                                     .padding(12.dp),
                                 shape = CircleShape,
-                                color = Color.Black.copy(alpha = 0.6f)
+                                color = Color.Black.copy(alpha = 0.65f)
                             ) {
                                 Text(
                                     text = "Page ${selectedPageIndex + 1} of ${currentDocument.pageCount}",
@@ -416,7 +521,7 @@ fun DocumentDetailScreen(
                                 .size(60.dp, 80.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(
-                                    if (isSelected) EmeraldPrimary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant
+                                    if (isSelected) EmeraldPrimary.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant
                                 )
                                 .clickable { selectedPageIndex = idx }
                                 .padding(4.dp),
@@ -468,11 +573,183 @@ fun DocumentDetailScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showRenameDialog = false }) {
-                    Text("Cancel")
-                }
+                TextButton(onClick = { showRenameDialog = false }) { Text("Cancel") }
             }
         )
+    }
+
+    // Adjust Bottom Sheet (Brightness & Contrast Sliders)
+    if (showAdjustSheet && currentPage != null) {
+        ModalBottomSheet(
+            onDismissRequest = { showAdjustSheet = false }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
+                Text(
+                    text = "Fine-Tune Image Adjustment",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Brightness Slider
+                Text(text = "Brightness: ${brightnessVal.toInt()}", fontSize = 13.sp)
+                Slider(
+                    value = brightnessVal,
+                    onValueChange = { brightnessVal = it },
+                    valueRange = -80f..80f,
+                    colors = SliderDefaults.colors(thumbColor = EmeraldPrimary, activeTrackColor = EmeraldPrimary)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Contrast Slider
+                Text(text = "Contrast: ${String.format("%.2f", contrastVal)}x", fontSize = 13.sp)
+                Slider(
+                    value = contrastVal,
+                    onValueChange = { contrastVal = it },
+                    valueRange = 0.5f..2.0f,
+                    colors = SliderDefaults.colors(thumbColor = EmeraldPrimary, activeTrackColor = EmeraldPrimary)
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            brightnessVal = 0f
+                            contrastVal = 1f
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Reset")
+                    }
+
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                val pageFile = File(currentPage.imagePath)
+                                val originalFile = File(currentPage.originalPath)
+                                val fileToProcess = if (originalFile.exists()) originalFile else pageFile
+                                val baseBmp = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(fileToProcess.absolutePath) }
+
+                                if (baseBmp != null) {
+                                    val adjusted = ImageProcessor.adjustBrightnessContrast(baseBmp, brightnessVal, contrastVal)
+                                    ImageProcessor.saveBitmapToFile(adjusted, pageFile, quality = 95)
+                                    refreshDoc()
+                                    Toast.makeText(context, "Adjustment applied!", Toast.LENGTH_SHORT).show()
+                                }
+                                showAdjustSheet = false
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary)
+                    ) {
+                        Text("Apply", color = Color.White)
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    }
+
+    // PDF Export Settings Sheet
+    if (showPdfSettingsSheet) {
+        ModalBottomSheet(onDismissRequest = { showPdfSettingsSheet = false }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "PDF Export Configuration",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Page Size Selector
+                Text(text = "Page Size", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Spacer(modifier = Modifier.height(6.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(PdfPageSize.values()) { size ->
+                        FilterChip(
+                            selected = size == pdfPageSize,
+                            onClick = { pdfPageSize = size },
+                            label = { Text(size.displayName, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = EmeraldPrimary.copy(alpha = 0.2f),
+                                selectedLabelColor = EmeraldPrimary
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Compression Quality
+                Text(text = "PDF File Quality", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Spacer(modifier = Modifier.height(6.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(PdfCompression.values()) { comp ->
+                        FilterChip(
+                            selected = comp == pdfCompression,
+                            onClick = { pdfCompression = comp },
+                            label = { Text(comp.displayName, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = EmeraldPrimary.copy(alpha = 0.2f),
+                                selectedLabelColor = EmeraldPrimary
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Page Numbering Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "Include Page Numbers (Page X of Y)", fontSize = 13.sp)
+                    Switch(
+                        checked = pdfPageNumbering,
+                        onCheckedChange = { pdfPageNumbering = it },
+                        colors = SwitchDefaults.colors(checkedThumbColor = EmeraldPrimary)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Custom Watermark
+                OutlinedTextField(
+                    value = pdfWatermarkText,
+                    onValueChange = { pdfWatermarkText = it },
+                    label = { Text("Watermark (Leave blank for clean PDF)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = { showPdfSettingsSheet = false },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary)
+                ) {
+                    Text("Save Settings", color = Color.White)
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
     }
 
     // OCR Result Dialog
@@ -496,7 +773,6 @@ fun DocumentDetailScreen(
                         val canvas = Canvas(merged)
                         canvas.drawBitmap(baseBmp, 0f, 0f, null)
 
-                        // Stamp signature at bottom right
                         val sigWidth = (baseBmp.width * 0.35f).toInt()
                         val sigHeight = (sigWidth * (signatureBmp.height.toFloat() / signatureBmp.width)).toInt()
                         val scaledSig = Bitmap.createScaledBitmap(signatureBmp, sigWidth, sigHeight, true)
@@ -507,7 +783,7 @@ fun DocumentDetailScreen(
 
                         ImageProcessor.saveBitmapToFile(merged, pageFile, quality = 95)
                         refreshDoc()
-                        Toast.makeText(context, "Signature applied to page!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Signature stamped on page!", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -526,18 +802,18 @@ private fun ActionItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = 4.dp, vertical = 4.dp)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
             tint = if (isDestructive) MaterialTheme.colorScheme.error else EmeraldPrimary,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(22.dp)
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             color = if (isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
         )
     }

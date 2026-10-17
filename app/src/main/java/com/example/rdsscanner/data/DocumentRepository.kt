@@ -3,6 +3,7 @@ package com.example.rdsscanner.data
 import android.content.Context
 import android.net.Uri
 import com.example.rdsscanner.model.DocCategory
+import com.example.rdsscanner.model.ScanFilter
 import com.example.rdsscanner.model.ScanPage
 import com.example.rdsscanner.model.ScannedDocument
 import kotlinx.coroutines.Dispatchers
@@ -51,18 +52,42 @@ class DocumentRepository(private val context: Context) {
                 val createdAt = obj.optLong("createdAt", System.currentTimeMillis())
                 val updatedAt = obj.optLong("updatedAt", System.currentTimeMillis())
 
+                val isStarred = obj.optBoolean("isStarred", false)
+
                 val pagesArray = obj.getJSONArray("pages")
                 val pages = mutableListOf<ScanPage>()
                 for (j in 0 until pagesArray.length()) {
                     val pObj = pagesArray.getJSONObject(j)
                     val pId = pObj.getString("id")
                     val imagePath = pObj.getString("imagePath")
+                    val originalPath = pObj.optString("originalPath", imagePath)
                     val rot = pObj.optInt("rotationDegrees", 0)
+                    val filterName = pObj.optString("filter", ScanFilter.MAGIC_COLOR.name)
+                    val filter = try { ScanFilter.valueOf(filterName) } catch (e: Exception) { ScanFilter.MAGIC_COLOR }
+                    val brightness = pObj.optDouble("brightness", 0.0).toFloat()
+                    val contrast = pObj.optDouble("contrast", 1.0).toFloat()
                     val ocr = if (pObj.has("ocrText")) pObj.getString("ocrText") else null
-                    pages.add(ScanPage(pId, imagePath, rot, ocr))
+                    pages.add(ScanPage(
+                        id = pId,
+                        imagePath = imagePath,
+                        originalPath = originalPath,
+                        rotationDegrees = rot,
+                        filter = filter,
+                        brightness = brightness,
+                        contrast = contrast,
+                        ocrText = ocr
+                    ))
                 }
 
-                list.add(ScannedDocument(id, title, category, pages, createdAt, updatedAt))
+                list.add(ScannedDocument(
+                    id = id,
+                    title = title,
+                    category = category,
+                    pages = pages,
+                    isStarred = isStarred,
+                    createdAt = createdAt,
+                    updatedAt = updatedAt
+                ))
             }
 
             _documents.value = list.sortedByDescending { it.updatedAt }
@@ -80,6 +105,7 @@ class DocumentRepository(private val context: Context) {
                     put("id", doc.id)
                     put("title", doc.title)
                     put("category", doc.category.name)
+                    put("isStarred", doc.isStarred)
                     put("createdAt", doc.createdAt)
                     put("updatedAt", doc.updatedAt)
 
@@ -88,7 +114,11 @@ class DocumentRepository(private val context: Context) {
                         val pObj = JSONObject().apply {
                             put("id", p.id)
                             put("imagePath", p.imagePath)
+                            put("originalPath", p.originalPath)
                             put("rotationDegrees", p.rotationDegrees)
+                            put("filter", p.filter.name)
+                            put("brightness", p.brightness.toDouble())
+                            put("contrast", p.contrast.toDouble())
                             p.ocrText?.let { put("ocrText", it) }
                         }
                         pagesArray.put(pObj)
