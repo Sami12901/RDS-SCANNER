@@ -1,6 +1,8 @@
 package com.example.rdsscanner.ui.camera
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -10,6 +12,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -39,14 +42,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FlashAuto
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.Highlight
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -78,10 +87,12 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.example.rdsscanner.scanner.ImageProcessor
 import com.example.rdsscanner.theme.EmeraldPrimary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -109,8 +120,27 @@ fun CameraScannerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
 
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasCameraPermission = isGranted
+    }
+
+    LaunchedEffect(Unit) {
+        if (!hasCameraPermission) {
+            permissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    var camera by remember { mutableStateOf<Camera?>(null) }
     var currentMode by remember { mutableStateOf(initialMode) }
     var flashMode by remember { mutableIntStateOf(ImageCapture.FLASH_MODE_AUTO) }
+    var isTorchOn by remember { mutableStateOf(false) }
     var showGrid by remember { mutableStateOf(false) }
     var isCapturing by remember { mutableStateOf(false) }
 
@@ -163,49 +193,91 @@ fun CameraScannerScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        // CameraX Live Preview
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                val previewView = PreviewView(ctx).apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    scaleType = PreviewView.ScaleType.FILL_CENTER
-                }
-
-                val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-                cameraProviderFuture.addListener({
-                    val cameraProvider = cameraProviderFuture.get()
-                    val preview = Preview.Builder().build().also {
-                        it.setSurfaceProvider(previewView.surfaceProvider)
-                    }
-                    val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-
-                    try {
-                        cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            cameraSelector,
-                            preview,
-                            imageCapture
+        if (hasCameraPermission) {
+            // CameraX Live Preview
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    val previewView = PreviewView(ctx).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
                         )
-                    } catch (e: Exception) {
-                        Log.e("CameraScanner", "Use case binding failed", e)
+                        scaleType = PreviewView.ScaleType.FILL_CENTER
                     }
-                }, ContextCompat.getMainExecutor(ctx))
 
-                previewView
+                    val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+                    cameraProviderFuture.addListener({
+                        val cameraProvider = cameraProviderFuture.get()
+                        val preview = Preview.Builder().build().also {
+                            it.setSurfaceProvider(previewView.surfaceProvider)
+                        }
+                        val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+                        try {
+                            cameraProvider.unbindAll()
+                            camera = cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                cameraSelector,
+                                preview,
+                                imageCapture
+                            )
+                        } catch (e: Exception) {
+                            Log.e("CameraScanner", "Use case binding failed", e)
+                        }
+                    }, ContextCompat.getMainExecutor(ctx))
+
+                    previewView
+                }
+            )
+
+            // Overlay with Card/Passport guides & darkened frame
+            ScannerOverlay(
+                mode = currentMode,
+                showGrid = showGrid,
+                isScanningIdBack = isScanningIdBack
+            )
+        } else {
+            // Permission Request Screen
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .background(EmeraldPrimary.copy(alpha = 0.2f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.CameraAlt, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(44.dp))
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(
+                    text = "Camera Permission Required",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "RDS SCANNER needs camera access to capture documents, ID cards, and passports clearly.",
+                    color = Color.LightGray,
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Grant Camera Permission", color = Color.White, fontWeight = FontWeight.Bold)
+                }
             }
-        )
-
-        // Overlay with Card/Passport guides & darkened frame
-        ScannerOverlay(
-            mode = currentMode,
-            showGrid = showGrid,
-            isScanningIdBack = isScanningIdBack
-        )
+        }
 
         // Top Toolbar
         Row(
@@ -242,6 +314,21 @@ fun CameraScannerScreen(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Torch toggle
+                IconButton(
+                    onClick = {
+                        isTorchOn = !isTorchOn
+                        camera?.cameraControl?.enableTorch(isTorchOn)
+                    },
+                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Highlight,
+                        contentDescription = "Torch",
+                        tint = if (isTorchOn) EmeraldPrimary else Color.White
+                    )
+                }
+
                 // Flash toggle
                 IconButton(
                     onClick = {
@@ -350,22 +437,30 @@ fun CameraScannerScreen(
                                 ContextCompat.getMainExecutor(context),
                                 object : ImageCapture.OnImageSavedCallback {
                                     override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                                        isCapturing = false
-                                        when (currentMode) {
-                                            ScannerMode.DOCS -> onSingleCaptured(photoFile)
-                                            ScannerMode.PASSPORT -> onPassportCaptured(photoFile)
-                                            ScannerMode.ID_CARD -> {
-                                                if (!isScanningIdBack) {
-                                                    idCardFrontFile = photoFile
-                                                    isScanningIdBack = true
-                                                    Toast.makeText(context, "Front captured! Now align Back side", Toast.LENGTH_SHORT).show()
-                                                } else {
-                                                    onIdCardCaptured(idCardFrontFile!!, photoFile)
+                                        coroutineScope.launch {
+                                            withContext(Dispatchers.IO) {
+                                                val rotated = ImageProcessor.loadRotatedBitmapFromFile(photoFile)
+                                                if (rotated != null) {
+                                                    ImageProcessor.saveBitmapToFile(rotated, photoFile, quality = 95)
                                                 }
                                             }
-                                            ScannerMode.BATCH -> {
-                                                batchFiles.add(photoFile)
-                                                Toast.makeText(context, "Page ${batchFiles.size} captured!", Toast.LENGTH_SHORT).show()
+                                            isCapturing = false
+                                            when (currentMode) {
+                                                ScannerMode.DOCS -> onSingleCaptured(photoFile)
+                                                ScannerMode.PASSPORT -> onPassportCaptured(photoFile)
+                                                ScannerMode.ID_CARD -> {
+                                                    if (!isScanningIdBack) {
+                                                        idCardFrontFile = photoFile
+                                                        isScanningIdBack = true
+                                                        Toast.makeText(context, "Front captured! Now align Back side", Toast.LENGTH_SHORT).show()
+                                                    } else {
+                                                        onIdCardCaptured(idCardFrontFile!!, photoFile)
+                                                    }
+                                                }
+                                                ScannerMode.BATCH -> {
+                                                    batchFiles.add(photoFile)
+                                                    Toast.makeText(context, "Page ${batchFiles.size} captured!", Toast.LENGTH_SHORT).show()
+                                                }
                                             }
                                         }
                                     }

@@ -86,10 +86,12 @@ import coil.compose.AsyncImage
 import com.example.rdsscanner.data.DocumentRepository
 import com.example.rdsscanner.model.DocCategory
 import com.example.rdsscanner.model.ScannedDocument
+import com.example.rdsscanner.scanner.DocumentScannerHelper
 import com.example.rdsscanner.scanner.PdfGenerator
 import com.example.rdsscanner.theme.EmeraldPrimary
 import com.example.rdsscanner.ui.about.AboutDialog
 import com.example.rdsscanner.ui.camera.ScannerMode
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
@@ -115,6 +117,7 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val activity = context as? Activity
 
     val documents by repository.documents.collectAsState()
 
@@ -123,6 +126,45 @@ fun HomeScreen(
     var sortOption by remember { mutableStateOf(SortOption.DATE_DESC) }
     var showSortMenu by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
+
+    // Google ML Kit Official Document Scanner
+    val gmsScanner = remember {
+        activity?.let { DocumentScannerHelper.createScanner(it) }
+    }
+    val scannerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val gmsResult = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
+            val pages = gmsResult?.pages
+            if (!pages.isNullOrEmpty()) {
+                coroutineScope.launch {
+                    val newDoc = repository.createDocumentFromUris(
+                        titlePrefix = "Scan",
+                        category = DocCategory.GENERAL,
+                        uris = pages.map { it.imageUri }
+                    )
+                    onDocumentClick(newDoc.id)
+                }
+            }
+        }
+    }
+
+    fun startSmartScan() {
+        if (activity != null && gmsScanner != null) {
+            DocumentScannerHelper.startScan(
+                scanner = gmsScanner,
+                activity = activity,
+                onSuccess = { request -> scannerLauncher.launch(request) },
+                onError = {
+                    // Fall back to custom CameraX scanner on devices without Google Play Services
+                    onOpenScanner(ScannerMode.DOCS)
+                }
+            )
+        } else {
+            onOpenScanner(ScannerMode.DOCS)
+        }
+    }
 
     // Gallery Picker
     val galleryPicker = rememberLauncherForActivityResult(
@@ -242,7 +284,7 @@ fun HomeScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { onOpenScanner(ScannerMode.DOCS) },
+                onClick = { startSmartScan() },
                 icon = { Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color.White) },
                 text = { Text("Scan Document", color = Color.White, fontWeight = FontWeight.Bold) },
                 containerColor = EmeraldPrimary
@@ -256,36 +298,54 @@ fun HomeScreen(
                 .background(MaterialTheme.colorScheme.background)
         ) {
             // Quick Feature Tiles (CamScanner Style)
-            Row(
+            LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                QuickTile(
-                    icon = Icons.Default.CameraAlt,
-                    label = "Smart Scan",
-                    onClick = { onOpenScanner(ScannerMode.DOCS) },
-                    modifier = Modifier.weight(1f)
-                )
-                QuickTile(
-                    icon = Icons.Default.Badge,
-                    label = "ID Card",
-                    onClick = { onOpenScanner(ScannerMode.ID_CARD) },
-                    modifier = Modifier.weight(1f)
-                )
-                QuickTile(
-                    icon = Icons.Default.Flight,
-                    label = "Passport",
-                    onClick = { onOpenScanner(ScannerMode.PASSPORT) },
-                    modifier = Modifier.weight(1f)
-                )
-                QuickTile(
-                    icon = Icons.Default.AddPhotoAlternate,
-                    label = "Import",
-                    onClick = { galleryPicker.launch("image/*") },
-                    modifier = Modifier.weight(1f)
-                )
+                item {
+                    QuickTile(
+                        icon = Icons.Default.DocumentScanner,
+                        label = "Smart Scan",
+                        onClick = { startSmartScan() }
+                    )
+                }
+                item {
+                    QuickTile(
+                        icon = Icons.Default.CameraAlt,
+                        label = "Camera",
+                        onClick = { onOpenScanner(ScannerMode.DOCS) }
+                    )
+                }
+                item {
+                    QuickTile(
+                        icon = Icons.Default.Badge,
+                        label = "ID Card",
+                        onClick = { onOpenScanner(ScannerMode.ID_CARD) }
+                    )
+                }
+                item {
+                    QuickTile(
+                        icon = Icons.Default.Flight,
+                        label = "Passport",
+                        onClick = { onOpenScanner(ScannerMode.PASSPORT) }
+                    )
+                }
+                item {
+                    QuickTile(
+                        icon = Icons.Default.PictureAsPdf,
+                        label = "Batch",
+                        onClick = { onOpenScanner(ScannerMode.BATCH) }
+                    )
+                }
+                item {
+                    QuickTile(
+                        icon = Icons.Default.AddPhotoAlternate,
+                        label = "Import",
+                        onClick = { galleryPicker.launch("image/*") }
+                    )
+                }
             }
 
             // Search Bar with Deep OCR capability

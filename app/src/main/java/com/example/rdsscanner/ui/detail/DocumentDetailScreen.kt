@@ -73,6 +73,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -93,6 +94,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.rdsscanner.data.DocumentRepository
 import com.example.rdsscanner.model.PdfCompression
 import com.example.rdsscanner.model.PdfPageSize
@@ -138,10 +140,13 @@ fun DocumentDetailScreen(
     var showSignatureDialog by remember { mutableStateOf(false) }
     var isGeneratingPdf by remember { mutableStateOf(false) }
     var isFilterApplying by remember { mutableStateOf(false) }
+    var imageUpdateVersion by remember { mutableIntStateOf(0) }
 
-    // Adjust sliders
+    // Adjust sliders & live preview
     var brightnessVal by remember { mutableFloatStateOf(0f) }
     var contrastVal by remember { mutableFloatStateOf(1f) }
+    var adjustBaseBmp by remember { mutableStateOf<Bitmap?>(null) }
+    var adjustPreviewBmp by remember { mutableStateOf<Bitmap?>(null) }
 
     // PDF custom settings
     var pdfPageSize by remember { mutableStateOf(PdfPageSize.A4) }
@@ -270,11 +275,12 @@ fun DocumentDetailScreen(
                                             val pageFile = File(currentPage.imagePath)
                                             val originalFile = File(currentPage.originalPath)
                                             val fileToProcess = if (originalFile.exists()) originalFile else pageFile
-                                            val baseBmp = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(fileToProcess.absolutePath) }
+                                            val baseBmp = ImageProcessor.loadRotatedBitmapFromFile(fileToProcess)
 
                                             if (baseBmp != null) {
                                                 val filtered = ImageProcessor.applyFilter(baseBmp, filter)
                                                 ImageProcessor.saveBitmapToFile(filtered, pageFile, quality = 95)
+                                                imageUpdateVersion++
 
                                                 val updatedPages = currentDocument.pages.map { p ->
                                                     if (p.id == currentPage.id) p.copy(filter = filter) else p
@@ -318,6 +324,7 @@ fun DocumentDetailScreen(
                                 if (currentPage != null) {
                                     coroutineScope.launch {
                                         repository.rotatePage(currentDocument.id, currentPage.id)
+                                        imageUpdateVersion++
                                         refreshDoc()
                                     }
                                 }
@@ -476,8 +483,16 @@ fun DocumentDetailScreen(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            val mainImageRequest = remember(currentPage.imagePath, imageUpdateVersion, currentPage.filter) {
+                                ImageRequest.Builder(context)
+                                    .data(File(currentPage.imagePath))
+                                    .memoryCacheKey("${currentPage.imagePath}_${currentPage.filter.name}_$imageUpdateVersion")
+                                    .diskCacheKey("${currentPage.imagePath}_${currentPage.filter.name}_$imageUpdateVersion")
+                                    .crossfade(true)
+                                    .build()
+                            }
                             AsyncImage(
-                                model = File(currentPage.imagePath),
+                                model = mainImageRequest,
                                 contentDescription = "Page ${selectedPageIndex + 1}",
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -527,8 +542,16 @@ fun DocumentDetailScreen(
                                 .padding(4.dp),
                             contentAlignment = Alignment.Center
                         ) {
+                            val thumbRequest = remember(page.imagePath, imageUpdateVersion, page.filter) {
+                                ImageRequest.Builder(context)
+                                    .data(File(page.imagePath))
+                                    .memoryCacheKey("${page.imagePath}_${page.filter.name}_$imageUpdateVersion")
+                                    .diskCacheKey("${page.imagePath}_${page.filter.name}_$imageUpdateVersion")
+                                    .crossfade(true)
+                                    .build()
+                            }
                             AsyncImage(
-                                model = File(page.imagePath),
+                                model = thumbRequest,
                                 contentDescription = null,
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -578,7 +601,26 @@ fun DocumentDetailScreen(
         )
     }
 
-    // Adjust Bottom Sheet (Brightness & Contrast Sliders)
+    LaunchedEffect(showAdjustSheet, currentPage) {
+        if (showAdjustSheet && currentPage != null) {
+            val pageFile = File(currentPage.imagePath)
+            val originalFile = File(currentPage.originalPath)
+            val fileToProcess = if (originalFile.exists()) originalFile else pageFile
+            adjustBaseBmp = ImageProcessor.loadRotatedBitmapFromFile(fileToProcess)
+            adjustPreviewBmp = adjustBaseBmp
+        } else {
+            adjustBaseBmp = null
+            adjustPreviewBmp = null
+        }
+    }
+
+    LaunchedEffect(brightnessVal, contrastVal, adjustBaseBmp) {
+        if (adjustBaseBmp != null) {
+            adjustPreviewBmp = ImageProcessor.adjustBrightnessContrast(adjustBaseBmp!!, brightnessVal, contrastVal)
+        }
+    }
+
+    // Adjust Bottom Sheet (Brightness & Contrast Sliders with Live Preview)
     if (showAdjustSheet && currentPage != null) {
         ModalBottomSheet(
             onDismissRequest = { showAdjustSheet = false }
@@ -593,7 +635,27 @@ fun DocumentDetailScreen(
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Live Preview Card
+                if (adjustPreviewBmp != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.Black),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            bitmap = adjustPreviewBmp!!.asImageBitmap(),
+                            contentDescription = "Adjustment Live Preview",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
 
                 // Brightness Slider
                 Text(text = "Brightness: ${brightnessVal.toInt()}", fontSize = 13.sp)
@@ -604,18 +666,18 @@ fun DocumentDetailScreen(
                     colors = SliderDefaults.colors(thumbColor = EmeraldPrimary, activeTrackColor = EmeraldPrimary)
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Contrast Slider
                 Text(text = "Contrast: ${String.format("%.2f", contrastVal)}x", fontSize = 13.sp)
                 Slider(
                     value = contrastVal,
                     onValueChange = { contrastVal = it },
-                    valueRange = 0.5f..2.0f,
+                    valueRange = 0.5f..2.5f,
                     colors = SliderDefaults.colors(thumbColor = EmeraldPrimary, activeTrackColor = EmeraldPrimary)
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -634,14 +696,10 @@ fun DocumentDetailScreen(
                     Button(
                         onClick = {
                             coroutineScope.launch {
-                                val pageFile = File(currentPage.imagePath)
-                                val originalFile = File(currentPage.originalPath)
-                                val fileToProcess = if (originalFile.exists()) originalFile else pageFile
-                                val baseBmp = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(fileToProcess.absolutePath) }
-
-                                if (baseBmp != null) {
-                                    val adjusted = ImageProcessor.adjustBrightnessContrast(baseBmp, brightnessVal, contrastVal)
-                                    ImageProcessor.saveBitmapToFile(adjusted, pageFile, quality = 95)
+                                if (adjustPreviewBmp != null) {
+                                    val pageFile = File(currentPage.imagePath)
+                                    ImageProcessor.saveBitmapToFile(adjustPreviewBmp!!, pageFile, quality = 95)
+                                    imageUpdateVersion++
                                     refreshDoc()
                                     Toast.makeText(context, "Adjustment applied!", Toast.LENGTH_SHORT).show()
                                 }

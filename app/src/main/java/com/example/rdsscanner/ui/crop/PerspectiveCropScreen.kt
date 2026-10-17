@@ -55,6 +55,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,6 +67,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 import kotlin.math.hypot
+import kotlin.math.min
 
 enum class Corner {
     NONE, TOP_LEFT, TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT
@@ -92,10 +94,10 @@ fun PerspectiveCropScreen(
     var bl by remember { mutableStateOf(Offset.Zero) }
     var activeCorner by remember { mutableStateOf(Corner.NONE) }
 
-    // Load bitmap
+    // Load bitmap with EXIF rotation check
     LaunchedEffect(imageFile, rotationAngle) {
         withContext(Dispatchers.IO) {
-            val bmp = BitmapFactory.decodeFile(imageFile.absolutePath)
+            val bmp = ImageProcessor.loadRotatedBitmapFromFile(imageFile)
             if (bmp != null) {
                 sourceBitmap = if (rotationAngle != 0) {
                     ImageProcessor.rotateBitmap(bmp, rotationAngle.toFloat())
@@ -106,19 +108,31 @@ fun PerspectiveCropScreen(
         }
     }
 
-    // Initialize corner positions inside canvas margins
-    fun resetCorners(w: Float, h: Float) {
-        val insetX = w * 0.08f
-        val insetY = h * 0.08f
-        tl = Offset(insetX, insetY)
-        tr = Offset(w - insetX, insetY)
-        br = Offset(w - insetX, h - insetY)
-        bl = Offset(insetX, h - insetY)
+    val bmp = sourceBitmap
+    val bmpW = bmp?.width?.toFloat() ?: 1f
+    val bmpH = bmp?.height?.toFloat() ?: 1f
+    val scale = if (canvasSize.width > 0 && canvasSize.height > 0) {
+        min(canvasSize.width.toFloat() / bmpW, canvasSize.height.toFloat() / bmpH)
+    } else 1f
+    val drawWidth = bmpW * scale
+    val drawHeight = bmpH * scale
+    val offsetX = if (canvasSize.width > 0) (canvasSize.width.toFloat() - drawWidth) / 2f else 0f
+    val offsetY = if (canvasSize.height > 0) (canvasSize.height.toFloat() - drawHeight) / 2f else 0f
+
+    // Initialize corner positions inside fitted image margins
+    fun resetCorners() {
+        if (drawWidth <= 0 || drawHeight <= 0) return
+        val insetX = drawWidth * 0.05f
+        val insetY = drawHeight * 0.05f
+        tl = Offset(offsetX + insetX, offsetY + insetY)
+        tr = Offset(offsetX + drawWidth - insetX, offsetY + insetY)
+        br = Offset(offsetX + drawWidth - insetX, offsetY + drawHeight - insetY)
+        bl = Offset(offsetX + insetX, offsetY + drawHeight - insetY)
     }
 
-    LaunchedEffect(canvasSize) {
-        if (canvasSize.width > 0 && canvasSize.height > 0) {
-            resetCorners(canvasSize.width.toFloat(), canvasSize.height.toFloat())
+    LaunchedEffect(canvasSize, sourceBitmap) {
+        if (canvasSize.width > 0 && canvasSize.height > 0 && sourceBitmap != null) {
+            resetCorners()
         }
     }
 
@@ -148,17 +162,26 @@ fun PerspectiveCropScreen(
                             if (sourceBitmap != null && canvasSize.width > 0 && canvasSize.height > 0 && !isProcessing) {
                                 isProcessing = true
                                 coroutineScope.launch {
-                                    val bmp = sourceBitmap!!
-                                    // Scale canvas points back to original bitmap coordinates
-                                    val scaleX = bmp.width.toFloat() / canvasSize.width.toFloat()
-                                    val scaleY = bmp.height.toFloat() / canvasSize.height.toFloat()
+                                    val currentBmp = sourceBitmap!!
+                                    // Scale canvas points back to original bitmap coordinates without distortion
+                                    val bmpTl = PointF(
+                                        ((tl.x - offsetX) / scale).coerceIn(0f, currentBmp.width.toFloat()),
+                                        ((tl.y - offsetY) / scale).coerceIn(0f, currentBmp.height.toFloat())
+                                    )
+                                    val bmpTr = PointF(
+                                        ((tr.x - offsetX) / scale).coerceIn(0f, currentBmp.width.toFloat()),
+                                        ((tr.y - offsetY) / scale).coerceIn(0f, currentBmp.height.toFloat())
+                                    )
+                                    val bmpBr = PointF(
+                                        ((br.x - offsetX) / scale).coerceIn(0f, currentBmp.width.toFloat()),
+                                        ((br.y - offsetY) / scale).coerceIn(0f, currentBmp.height.toFloat())
+                                    )
+                                    val bmpBl = PointF(
+                                        ((bl.x - offsetX) / scale).coerceIn(0f, currentBmp.width.toFloat()),
+                                        ((bl.y - offsetY) / scale).coerceIn(0f, currentBmp.height.toFloat())
+                                    )
 
-                                    val bmpTl = PointF(tl.x * scaleX, tl.y * scaleY)
-                                    val bmpTr = PointF(tr.x * scaleX, tr.y * scaleY)
-                                    val bmpBr = PointF(br.x * scaleX, br.y * scaleY)
-                                    val bmpBl = PointF(bl.x * scaleX, bl.y * scaleY)
-
-                                    val cropped = ImageProcessor.warpPerspective(bmp, bmpTl, bmpTr, bmpBr, bmpBl)
+                                    val cropped = ImageProcessor.warpPerspective(currentBmp, bmpTl, bmpTr, bmpBr, bmpBl)
                                     val outputFile = File(context.cacheDir, "crop_${UUID.randomUUID()}.jpg")
                                     ImageProcessor.saveBitmapToFile(cropped, outputFile, quality = 95)
 
@@ -188,11 +211,7 @@ fun PerspectiveCropScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedButton(
-                        onClick = {
-                            if (canvasSize.width > 0) {
-                                resetCorners(canvasSize.width.toFloat(), canvasSize.height.toFloat())
-                            }
-                        }
+                        onClick = { resetCorners() }
                     ) {
                         Icon(Icons.Default.CropFree, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(6.dp))
@@ -218,7 +237,7 @@ fun PerspectiveCropScreen(
             contentAlignment = Alignment.Center
         ) {
             if (sourceBitmap != null) {
-                val bmp = sourceBitmap!!
+                val currentBmp = sourceBitmap!!
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -227,11 +246,11 @@ fun PerspectiveCropScreen(
                             canvasSize = coordinates.size
                         }
                 ) {
-                    // Interactive Canvas with Image + 4 Corner Handles
+                    // Interactive Canvas with un-stretched Image + 4 Corner Handles
                     Canvas(
                         modifier = Modifier
                             .fillMaxSize()
-                            .pointerInput(canvasSize) {
+                            .pointerInput(canvasSize, drawWidth, drawHeight, offsetX, offsetY) {
                                 detectDragGestures(
                                     onDragStart = { pos ->
                                         val touchRadius = 80f
@@ -245,32 +264,34 @@ fun PerspectiveCropScreen(
                                     },
                                     onDrag = { change, dragAmount ->
                                         change.consume()
-                                        val w = canvasSize.width.toFloat()
-                                        val h = canvasSize.height.toFloat()
+                                        val minX = offsetX
+                                        val maxX = offsetX + drawWidth
+                                        val minY = offsetY
+                                        val maxY = offsetY + drawHeight
 
                                         when (activeCorner) {
                                             Corner.TOP_LEFT -> {
                                                 tl = Offset(
-                                                    (tl.x + dragAmount.x).coerceIn(0f, tr.x - 40f),
-                                                    (tl.y + dragAmount.y).coerceIn(0f, bl.y - 40f)
+                                                    (tl.x + dragAmount.x).coerceIn(minX, tr.x - 30f),
+                                                    (tl.y + dragAmount.y).coerceIn(minY, bl.y - 30f)
                                                 )
                                             }
                                             Corner.TOP_RIGHT -> {
                                                 tr = Offset(
-                                                    (tr.x + dragAmount.x).coerceIn(tl.x + 40f, w),
-                                                    (tr.y + dragAmount.y).coerceIn(0f, br.y - 40f)
+                                                    (tr.x + dragAmount.x).coerceIn(tl.x + 30f, maxX),
+                                                    (tr.y + dragAmount.y).coerceIn(minY, br.y - 30f)
                                                 )
                                             }
                                             Corner.BOTTOM_RIGHT -> {
                                                 br = Offset(
-                                                    (br.x + dragAmount.x).coerceIn(bl.x + 40f, w),
-                                                    (br.y + dragAmount.y).coerceIn(tr.y + 40f, h)
+                                                    (br.x + dragAmount.x).coerceIn(bl.x + 30f, maxX),
+                                                    (br.y + dragAmount.y).coerceIn(tr.y + 30f, maxY)
                                                 )
                                             }
                                             Corner.BOTTOM_LEFT -> {
                                                 bl = Offset(
-                                                    (bl.x + dragAmount.x).coerceIn(0f, br.x - 40f),
-                                                    (bl.y + dragAmount.y).coerceIn(tl.y + 40f, h)
+                                                    (bl.x + dragAmount.x).coerceIn(minX, br.x - 30f),
+                                                    (bl.y + dragAmount.y).coerceIn(tl.y + 30f, maxY)
                                                 )
                                             }
                                             Corner.NONE -> {}
@@ -281,10 +302,11 @@ fun PerspectiveCropScreen(
                                 )
                             }
                     ) {
-                        // 1. Draw source background image scaled to canvas
+                        // 1. Draw source background image with true aspect ratio centered
                         drawImage(
-                            image = bmp.asImageBitmap(),
-                            dstSize = canvasSize
+                            image = currentBmp.asImageBitmap(),
+                            dstOffset = IntOffset(offsetX.toInt(), offsetY.toInt()),
+                            dstSize = IntSize(drawWidth.toInt(), drawHeight.toInt())
                         )
 
                         // 2. Draw semi-transparent green tint inside polygon

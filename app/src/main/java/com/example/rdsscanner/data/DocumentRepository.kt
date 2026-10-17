@@ -248,11 +248,15 @@ class DocumentRepository(private val context: Context) {
         return File(context.cacheDir, "${sanitizedTitle}.pdf")
     }
 
-    private fun copyUriToFile(uri: Uri, targetFile: File) {
+    private suspend fun copyUriToFile(uri: Uri, targetFile: File) {
         context.contentResolver.openInputStream(uri)?.use { input ->
             FileOutputStream(targetFile).use { output ->
                 input.copyTo(output)
             }
+        }
+        val rotated = com.example.rdsscanner.scanner.ImageProcessor.loadRotatedBitmapFromFile(targetFile)
+        if (rotated != null) {
+            com.example.rdsscanner.scanner.ImageProcessor.saveBitmapToFile(rotated, targetFile, quality = 95)
         }
     }
 }

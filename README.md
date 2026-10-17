@@ -26,8 +26,8 @@
 Get the latest version directly for your Android phone:
 
 <p align="center">
-  <a href="https://github.com/Sami12901/RDS-SCANNER/releases/download/v1.1.0/RDS-SCANNER-v1.1.0.apk">
-    <img src="https://img.shields.io/badge/Download_APK-v1.1.0_(23.2_MB)-00A86B?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" />
+  <a href="https://github.com/Sami12901/RDS-SCANNER/releases/download/v1.2.0/RDS-SCANNER-v1.2.0.apk">
+    <img src="https://img.shields.io/badge/Download_APK-v1.2.0_(23.2_MB)-00A86B?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" />
   </a>
 </p>
 
@@ -90,7 +90,7 @@ Commercial scanner apps like CamScanner come with intrusive advertisements, cost
 
 ## 📲 How to Install the APK on Android
 
-1. Download [`RDS-SCANNER-v1.1.0.apk`](https://github.com/Sami12901/RDS-SCANNER/releases/download/v1.1.0/RDS-SCANNER-v1.1.0.apk) on your Android device.
+1. Download [`RDS-SCANNER-v1.2.0.apk`](https://github.com/Sami12901/RDS-SCANNER/releases/download/v1.2.0/RDS-SCANNER-v1.2.0.apk) on your Android device.
 2. Tap the downloaded file in your browser or File Manager.
 3. If prompted with *"For your security, your phone is not allowed to install unknown apps from this source"*, tap **Settings** and enable **"Allow from this source"**.
 4. Tap **Install** and open **RDS SCANNER**!

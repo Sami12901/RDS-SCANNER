@@ -80,7 +80,9 @@ fun MainNavigation() {
                                 category = DocCategory.GENERAL,
                                 uris = files.map { Uri.fromFile(it) }
                             )
-                            backStack.removeLastOrNull()
+                            while (backStack.isNotEmpty() && backStack.lastOrNull() !is HomeKey) {
+                                backStack.removeLastOrNull()
+                            }
                             backStack.add(DetailKey(newDoc.id))
                         }
                     }
@@ -99,7 +101,9 @@ fun MainNavigation() {
                                 category = DocCategory.GENERAL,
                                 uris = listOf(Uri.fromFile(croppedFile))
                             )
-                            backStack.removeLastOrNull()
+                            while (backStack.isNotEmpty() && backStack.lastOrNull() !is HomeKey) {
+                                backStack.removeLastOrNull()
+                            }
                             backStack.add(DetailKey(newDoc.id))
                         }
                     }
@@ -115,7 +119,9 @@ fun MainNavigation() {
                     repository = repository,
                     onBack = { backStack.removeLastOrNull() },
                     onFinished = { newDoc ->
-                        backStack.removeLastOrNull()
+                        while (backStack.isNotEmpty() && backStack.lastOrNull() !is HomeKey) {
+                            backStack.removeLastOrNull()
+                        }
                         backStack.add(DetailKey(newDoc.id))
                     }
                 )

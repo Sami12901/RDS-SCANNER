@@ -26,8 +26,8 @@ object ImageProcessor {
         when (filter) {
             ScanFilter.ORIGINAL -> srcBitmap
             ScanFilter.MAGIC_COLOR -> toMagicColor(srcBitmap)
-            ScanFilter.BW_DOCUMENT -> toBlackAndWhite(srcBitmap, threshold = 145)
-            ScanFilter.BW_TEXT -> toBlackAndWhite(srcBitmap, threshold = 165)
+            ScanFilter.BW_DOCUMENT -> toBlackAndWhite(srcBitmap, offset = 0)
+            ScanFilter.BW_TEXT -> toBlackAndWhite(srcBitmap, offset = 14)
             ScanFilter.GRAYSCALE -> toGrayscale(srcBitmap)
             ScanFilter.LIGHTEN -> toLighten(srcBitmap)
         }
@@ -36,8 +36,26 @@ object ImageProcessor {
     private fun toGrayscale(src: Bitmap): Bitmap {
         val output = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
+        
+        val contrast = 1.35f
+        val brightness = 20f
+        val translate = (-0.5f * contrast + 0.5f) * 255f + brightness
+
+        val cm = ColorMatrix().apply {
+            setSaturation(0f)
+            val contrastMatrix = ColorMatrix(
+                floatArrayOf(
+                    contrast, 0f, 0f, 0f, translate,
+                    0f, contrast, 0f, 0f, translate,
+                    0f, 0f, contrast, 0f, translate,
+                    0f, 0f, 0f, 1f, 0f
+                )
+            )
+            postConcat(contrastMatrix)
+        }
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
+            isFilterBitmap = true
+            colorFilter = ColorMatrixColorFilter(cm)
         }
         canvas.drawBitmap(src, 0f, 0f, paint)
         return output
@@ -45,27 +63,32 @@ object ImageProcessor {
 
     /**
      * CamScanner signature Magic Color filter:
-     * Removes yellowish shadows, pushes background to crisp white, and intensifies text ink.
+     * Centers contrast around 128 mid-tone with background whitening translation
+     * and boosts color saturation to 1.35x for vibrant stamps, signatures, and deep ink.
      */
     private fun toMagicColor(src: Bitmap): Bitmap {
         val output = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
 
-        val contrast = 1.45f
-        val brightness = 28f
+        val contrast = 1.6f
+        val brightness = 42f
+        // Centered contrast formula: (R - 128) * contrast + 128 + brightness
+        val translate = (-0.5f * contrast + 0.5f) * 255f + brightness
 
-        val cm = ColorMatrix(
+        val contrastMatrix = ColorMatrix(
             floatArrayOf(
-                contrast, 0f, 0f, 0f, brightness,
-                0f, contrast, 0f, 0f, brightness,
-                0f, 0f, contrast, 0f, brightness,
+                contrast, 0f, 0f, 0f, translate,
+                0f, contrast, 0f, 0f, translate,
+                0f, 0f, contrast, 0f, translate,
                 0f, 0f, 0f, 1f, 0f
             )
         )
+        val saturationMatrix = ColorMatrix().apply { setSaturation(1.35f) }
+        contrastMatrix.postConcat(saturationMatrix)
 
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             isFilterBitmap = true
-            colorFilter = ColorMatrixColorFilter(cm)
+            colorFilter = ColorMatrixColorFilter(contrastMatrix)
         }
         canvas.drawBitmap(src, 0f, 0f, paint)
         return output
@@ -74,11 +97,14 @@ object ImageProcessor {
     private fun toLighten(src: Bitmap): Bitmap {
         val output = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
+        val contrast = 1.15f
+        val brightness = 45f
+        val translate = (-0.5f * contrast + 0.5f) * 255f + brightness
         val cm = ColorMatrix(
             floatArrayOf(
-                1.1f, 0f, 0f, 0f, 50f,
-                0f, 1.1f, 0f, 0f, 50f,
-                0f, 0f, 1.1f, 0f, 50f,
+                contrast, 0f, 0f, 0f, translate,
+                0f, contrast, 0f, 0f, translate,
+                0f, 0f, contrast, 0f, translate,
                 0f, 0f, 0f, 1f, 0f
             )
         )
@@ -90,20 +116,64 @@ object ImageProcessor {
         return output
     }
 
-    private fun toBlackAndWhite(src: Bitmap, threshold: Int): Bitmap {
+    /**
+     * Otsu Adaptive Binarization for razor-sharp Black & White document scanning
+     * across different ambient lighting conditions and shadows.
+     */
+    private fun toBlackAndWhite(src: Bitmap, offset: Int = 0): Bitmap {
         val width = src.width
         val height = src.height
         val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val pixels = IntArray(width * height)
         src.getPixels(pixels, 0, width, 0, 0, width, height)
 
+        // 1. Build luminance histogram
+        val histogram = IntArray(256)
         for (i in pixels.indices) {
             val c = pixels[i]
             val r = (c shr 16) and 0xFF
             val g = (c shr 8) and 0xFF
             val b = c and 0xFF
-            val luminance = (0.299 * r + 0.587 * g + 0.114 * b).toInt()
-            pixels[i] = if (luminance > threshold) Color.WHITE else Color.BLACK
+            val lum = (0.299f * r + 0.587f * g + 0.114f * b).toInt().coerceIn(0, 255)
+            histogram[lum]++
+        }
+
+        // 2. Compute Otsu optimal threshold
+        val total = pixels.size
+        var sum = 0.0
+        for (t in 0..255) sum += t * histogram[t]
+
+        var sumB = 0.0
+        var wB = 0
+        var varMax = 0.0
+        var otsuThreshold = 128
+
+        for (t in 0..255) {
+            wB += histogram[t]
+            if (wB == 0) continue
+            val wF = total - wB
+            if (wF == 0) break
+
+            sumB += t * histogram[t]
+            val mB = sumB / wB
+            val mF = (sum - sumB) / wF
+            val varBetween = wB.toDouble() * wF.toDouble() * (mB - mF) * (mB - mF)
+            if (varBetween > varMax) {
+                varMax = varBetween
+                otsuThreshold = t
+            }
+        }
+
+        val finalThreshold = (otsuThreshold + offset).coerceIn(80, 195)
+
+        // 3. Threshold pixels
+        for (i in pixels.indices) {
+            val c = pixels[i]
+            val r = (c shr 16) and 0xFF
+            val g = (c shr 8) and 0xFF
+            val b = c and 0xFF
+            val luminance = (0.299f * r + 0.587f * g + 0.114f * b).toInt()
+            pixels[i] = if (luminance > finalThreshold) Color.WHITE else Color.BLACK
         }
 
         output.setPixels(pixels, 0, width, 0, 0, width, height)
@@ -111,21 +181,23 @@ object ImageProcessor {
     }
 
     /**
-     * Real-time Brightness & Contrast fine-tuning adjustments.
+     * Real-time Brightness & Contrast fine-tuning adjustments using centered contrast.
      */
     suspend fun adjustBrightnessContrast(
         src: Bitmap,
-        brightness: Float, // -100 to +100
-        contrast: Float    // 0.5 to 2.0
+        brightness: Float, // -80 to +80
+        contrast: Float    // 0.5 to 2.5
     ): Bitmap = withContext(Dispatchers.Default) {
         val output = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
 
+        val translate = (-0.5f * contrast + 0.5f) * 255f + brightness
+
         val cm = ColorMatrix(
             floatArrayOf(
-                contrast, 0f, 0f, 0f, brightness,
-                0f, contrast, 0f, 0f, brightness,
-                0f, 0f, contrast, 0f, brightness,
+                contrast, 0f, 0f, 0f, translate,
+                0f, contrast, 0f, 0f, translate,
+                0f, 0f, contrast, 0f, translate,
                 0f, 0f, 0f, 1f, 0f
             )
         )
@@ -385,14 +457,38 @@ object ImageProcessor {
         }
     }
 
-    suspend fun loadBitmapFromFile(file: File, sampleSize: Int = 1): Bitmap? = withContext(Dispatchers.IO) {
+    suspend fun loadBitmapFromFile(file: File, sampleSize: Int = 1): Bitmap? = loadRotatedBitmapFromFile(file, sampleSize)
+
+    suspend fun loadRotatedBitmapFromFile(file: File, sampleSize: Int = 1): Bitmap? = withContext(Dispatchers.IO) {
         if (!file.exists()) return@withContext null
         try {
             val options = BitmapFactory.Options().apply {
                 inSampleSize = sampleSize
                 inPreferredConfig = Bitmap.Config.ARGB_8888
             }
-            BitmapFactory.decodeFile(file.absolutePath, options)
+            val original = BitmapFactory.decodeFile(file.absolutePath, options) ?: return@withContext null
+            val exif = try {
+                android.media.ExifInterface(file.absolutePath)
+            } catch (e: Exception) {
+                null
+            }
+            val orientation = exif?.getAttributeInt(
+                android.media.ExifInterface.TAG_ORIENTATION,
+                android.media.ExifInterface.ORIENTATION_NORMAL
+            ) ?: android.media.ExifInterface.ORIENTATION_NORMAL
+
+            val rotationAngle = when (orientation) {
+                android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                else -> 0f
+            }
+
+            if (rotationAngle != 0f) {
+                rotateBitmap(original, rotationAngle)
+            } else {
+                original
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             null

@@ -115,8 +115,8 @@ fun IdCardWorkflowScreen(
     fun updatePreview() {
         isGeneratingPreview = true
         coroutineScope.launch {
-            val frontBmp = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(frontFile.absolutePath) }
-            val backBmp = backFile?.let { withContext(Dispatchers.IO) { BitmapFactory.decodeFile(it.absolutePath) } }
+            val frontBmp = ImageProcessor.loadRotatedBitmapFromFile(frontFile)
+            val backBmp = backFile?.let { ImageProcessor.loadRotatedBitmapFromFile(it) }
 
             if (frontBmp != null) {
                 val wm = if (enableKycWatermark && watermarkText.isNotBlank()) watermarkText else null
