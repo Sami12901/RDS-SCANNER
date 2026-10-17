@@ -64,23 +64,24 @@ jobs:
       - name: Build iOS Application Binary
         run: |
           cd ios/RDSScanner
-          mkdir -p build/Release-iphoneos
           xcodebuild -project RDSScanner.xcodeproj \
             -scheme RDSScanner \
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            CONFIGURATION_BUILD_DIR="$PWD/build/Release-iphoneos" \
-            clean build
+            build
 
       - name: Package .ipa (iOS Application Archive)
         run: |
           cd ios/RDSScanner
           mkdir -p build/Payload
-          cp -r build/Release-iphoneos/RDSScanner.app build/Payload/
+          APP_PATH=$(find build/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
+          echo "Found compiled app at: $APP_PATH"
+          cp -r "$APP_PATH" build/Payload/
           cd build
           zip -qr RDSScanner-v1.3.0.ipa Payload
           cd ../../..

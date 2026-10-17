@@ -6,7 +6,7 @@ public struct HomeView: View {
     @State private var showingScanner = false
     @State private var showingAbout = false
     @State private var searchText = ""
-    @State private var selectedDocumentForDetail: ScannedDocument?
+    @State private var navigationPath = NavigationPath()
     @State private var documentToRename: ScannedDocument?
     @State private var newDocumentName = ""
     @State private var showingRenameDialog = false
@@ -28,7 +28,7 @@ public struct HomeView: View {
     public init() {}
 
     public var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ZStack(alignment: .bottomTrailing) {
                 VStack(spacing: 0) {
                     // Header with Sami12901 branding
@@ -118,14 +118,14 @@ public struct HomeView: View {
                         formatter.dateFormat = "yyyy-MM-dd_HHmmss"
                         let docName = "Scan_\(formatter.string(from: Date()))"
                         let newDoc = storageManager.createDocument(name: docName, scannedImages: scannedImages)
-                        selectedDocumentForDetail = newDoc
+                        navigationPath.append(newDoc)
                     }
                 )
             }
             .sheet(isPresented: $showingAbout) {
                 AboutView()
             }
-            .navigationDestination(item: $selectedDocumentForDetail) { doc in
+            .navigationDestination(for: ScannedDocument.self) { doc in
                 DocumentDetailView(documentId: doc.id)
             }
             .alert("Rename Document", isPresented: $showingRenameDialog) {
@@ -179,7 +179,7 @@ public struct HomeView: View {
                     DocumentCard(
                         document: doc,
                         onTap: {
-                            selectedDocumentForDetail = doc
+                            navigationPath.append(doc)
                         },
                         onShare: {
                             shareDocumentAsPDF(doc)
