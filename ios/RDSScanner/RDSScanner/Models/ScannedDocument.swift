@@ -23,7 +23,7 @@ public enum FilterType: String, Codable, CaseIterable, Identifiable {
 }
 
 /// A single page inside a scanned document
-public struct ScannedPage: Identifiable, Codable, Equatable {
+public struct ScannedPage: Identifiable, Codable, Equatable, Hashable {
     public let id: String
     public var pageIndex: Int
     /// File name of the pristine raw camera capture (used for non-destructive filter switching)
@@ -54,7 +54,7 @@ public struct ScannedPage: Identifiable, Codable, Equatable {
 }
 
 /// A complete multi-page scanned document
-public struct ScannedDocument: Identifiable, Codable, Equatable {
+public struct ScannedDocument: Identifiable, Codable, Equatable, Hashable {
     public let id: String
     public var name: String
     public var pages: [ScannedPage]

@@ -2,6 +2,7 @@ import SwiftUI
 
 /// An interactive overlay placed on top of a scanned document page, allowing the user
 /// to drag, scale, recolor, and burn a signature directly into the page image.
+@MainActor
 public struct SignatureOverlayView: View {
     public let baseImage: UIImage
     @Binding public var signatureImage: UIImage?

@@ -109,7 +109,7 @@ public final class ImageProcessor: @unchecked Sendable {
         let monoFilter = CIFilter.photoEffectMono()
         monoFilter.inputImage = ciInput
 
-        var current = monoFilter.outputImage ?? ciInput
+        let current = monoFilter.outputImage ?? ciInput
 
         let controls = CIFilter.colorControls()
         controls.inputImage = current
@@ -130,7 +130,7 @@ public final class ImageProcessor: @unchecked Sendable {
         shadowFilter.shadowAmount = 0.65
         shadowFilter.highlightAmount = 0.85
 
-        var current = shadowFilter.outputImage ?? ciInput
+        let current = shadowFilter.outputImage ?? ciInput
 
         let controls = CIFilter.colorControls()
         controls.inputImage = current

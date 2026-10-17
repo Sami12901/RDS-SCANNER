@@ -72,7 +72,7 @@ public final class SignatureManager: ObservableObject {
     // MARK: - Auto-Crop Transparent Bounding Box
 
     /// Scans pixel alpha values and crops tightly to stroke boundaries with minimal padding
-    public func cropToBoundingBox(image: UIImage, padding: CGFloat = 8.0) -> UIImage? {
+    public nonisolated func cropToBoundingBox(image: UIImage, padding: CGFloat = 8.0) -> UIImage? {
         guard let cgImage = image.cgImage else { return nil }
 
         let width = cgImage.width
@@ -132,7 +132,7 @@ public final class SignatureManager: ObservableObject {
     // MARK: - Dynamic Ink Recoloring
 
     /// Dynamically recolors a transparent signature stroke while preserving anti-aliased edge alphas
-    public func recolor(image: UIImage, to color: UIColor) -> UIImage {
+    public nonisolated func recolor(image: UIImage, to color: UIColor) -> UIImage {
         let format = UIGraphicsImageRendererFormat()
         format.scale = image.scale
         format.opaque = false
