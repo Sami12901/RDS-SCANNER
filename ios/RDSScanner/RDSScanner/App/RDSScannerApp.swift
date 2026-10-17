@@ -15,7 +15,7 @@ public struct RDSScannerApp: App {
 
     public var body: some Scene {
         WindowGroup {
-            HomeView()
+            MainTabView()
                 .tint(emeraldColor)
         }
     }

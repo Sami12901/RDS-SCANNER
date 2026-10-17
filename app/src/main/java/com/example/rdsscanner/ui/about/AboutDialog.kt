@@ -161,19 +161,24 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         PerkItem(
+                            icon = Icons.Default.DocumentScanner,
+                            title = "CamScanner + Adobe Acrobat Combined",
+                            subtitle = "Edge scan, Magic Color, PDF Editor, Annotations, & Tools"
+                        )
+                        PerkItem(
                             icon = Icons.Default.MoneyOff,
                             title = "100% Free & No Ads",
                             subtitle = "Zero subscriptions, zero annoying popups"
                         )
                         PerkItem(
                             icon = Icons.Default.CheckCircle,
-                            title = "No Watermark",
+                            title = "No Forced Watermark",
                             subtitle = "Completely clean, professional PDF exports"
                         )
                         PerkItem(
                             icon = Icons.Default.Lock,
                             title = "100% On-Device Privacy",
-                            subtitle = "Your scans and data never leave your phone"
+                            subtitle = "Your scans and PDFs never leave your phone"
                         )
                         PerkItem(
                             icon = Icons.Default.Code,
@@ -186,7 +191,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Version 1.2.0 • Open Source License\nCrafted with pride by Sami\ngithub.com/Sami12901/RDS-SCANNER",
+                    text = "Version 1.4.0 • CamScanner + Adobe Acrobat Powerhouse\nCrafted with pride by Sami\ngithub.com/Sami12901/RDS-SCANNER",
                     fontSize = 11.sp,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)

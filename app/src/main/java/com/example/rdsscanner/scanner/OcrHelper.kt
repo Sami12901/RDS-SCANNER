@@ -1,6 +1,7 @@
 package com.example.rdsscanner.scanner
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import com.google.mlkit.vision.common.InputImage
@@ -30,6 +31,21 @@ object OcrHelper {
                 return@suspendCancellableCoroutine
             }
 
+            val image = InputImage.fromBitmap(bitmap, 0)
+            recognizer.process(image)
+                .addOnSuccessListener { visionText ->
+                    continuation.resume(Result.success(visionText.text))
+                }
+                .addOnFailureListener { e ->
+                    continuation.resume(Result.failure(e))
+                }
+        } catch (e: Exception) {
+            continuation.resume(Result.failure(e))
+        }
+    }
+
+    suspend fun recognizeTextFromBitmap(bitmap: Bitmap): Result<String> = suspendCancellableCoroutine { continuation ->
+        try {
             val image = InputImage.fromBitmap(bitmap, 0)
             recognizer.process(image)
                 .addOnSuccessListener { visionText ->

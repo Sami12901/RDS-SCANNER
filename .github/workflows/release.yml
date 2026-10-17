@@ -38,15 +38,16 @@ jobs:
       - name: Locate and Prepare APK
         run: |
           mkdir -p output_apk
+          TAG="${GITHUB_REF_NAME:-v1.4.0}"
           APK_PATH=$(find app/build/outputs/apk -name "*release.apk" -o -name "*debug.apk" | grep -v "unsigned" | head -n 1)
           echo "Found Signed APK at: $APK_PATH"
-          cp "$APK_PATH" output_apk/RDS-SCANNER-v1.3.0.apk
+          cp "$APK_PATH" "output_apk/RDS-SCANNER-${TAG}.apk"
 
       - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: output_apk/RDS-SCANNER-v1.3.0.apk
+          path: output_apk/*
 
   # ==========================================
   # Job 2: Build Native iOS App
@@ -77,22 +78,31 @@ jobs:
 
       - name: Package .ipa (iOS Application Archive)
         run: |
+          TAG="${GITHUB_REF_NAME:-v1.4.0}"
           cd ios/RDSScanner
           mkdir -p build/Payload
           APP_PATH=$(find build/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
           echo "Found compiled app at: $APP_PATH"
           cp -r "$APP_PATH" build/Payload/
           cd build
-          zip -qr RDSScanner-v1.3.0.ipa Payload
+          zip -qr "RDSScanner-${TAG}.ipa" Payload
           cd ../../..
           mkdir -p output_ios
-          cp ios/RDSScanner/build/RDSScanner-v1.3.0.ipa output_ios/
+          cp "ios/RDSScanner/build/RDSScanner-${TAG}.ipa" output_ios/
+
+      - name: Package iOS Source Zip
+        run: |
+          TAG="${GITHUB_REF_NAME:-v1.4.0}"
+          cd ios
+          zip -qr "RDSScanner-iOS-${TAG}.zip" RDSScanner
+          cd ..
+          cp "ios/RDSScanner-iOS-${TAG}.zip" output_ios/
 
       - name: Upload iOS IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
-          path: output_ios/RDSScanner-v1.3.0.ipa
+          path: output_ios/*
 
   # ==========================================
   # Job 3: Publish GitHub Release
@@ -121,19 +131,42 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name || 'v1.3.0' }}
-          name: RDS SCANNER ${{ github.ref_name || 'v1.3.0' }} — Android APK & iOS IPA Release
+          tag_name: ${{ github.ref_name || 'v1.4.0' }}
+          name: RDS SCANNER ${{ github.ref_name || 'v1.4.0' }} — CamScanner + Adobe Acrobat Super App Release
           draft: false
           prerelease: false
           files: |
-            release_assets/RDS-SCANNER-v1.3.0.apk
-            release_assets/RDSScanner-v1.3.0.ipa
+            release_assets/*.apk
+            release_assets/*.ipa
+            release_assets/*.zip
           body: |
-            ## 🚀 RDS SCANNER v1.3.0 — The Ultimate Privacy-First CamScanner Alternative
+            ## 🚀 RDS SCANNER v1.4.0 — Unified CamScanner & Adobe Acrobat Super App
 
             Developed with ❤️ by **[Sami12901](https://github.com/Sami12901)**.
             
-            ### 🌟 What's New in v1.3.0:
+            ### 🌟 Major Upgrades in v1.4.0:
+            - **📕 Adobe Acrobat Reader & PDF Editor Integration**:
+              - Complete PDF Viewer supporting any external or local PDF document (via Storage Access Framework & system intents).
+              - **Interactive Vector Canvas**: Freehand Pen (multi-color), Highlighters (Yellow, Green, Cyan, Pink), Type on PDF (Text Notes), Sticky Note Comments, and Shapes (Rectangles, Circles, Arrows, Lines).
+              - **Lossless Annotation Baking Engine**: High-fidelity PDF re-export with vector annotations baked at 300 DPI.
+              - **Page Organizer**: Visual thumbnail grid to rotate pages 90°, delete pages, and reorder.
+              - **Dark & Night Reading Mode**: Eye-friendly inverted contrast palette.
+            - **🛠️ Adobe Acrobat PDF Tools Suite**:
+              - **Merge PDFs**: Combine multiple PDF files into one continuous document.
+              - **Split PDF**: Separate document into single-page files.
+              - **Compress PDF**: High-efficiency compression reducing file size by 50-80% while retaining crisp readability.
+              - **Add Watermark**: Confidential, Draft, or custom text watermarks across all pages.
+              - **Images to PDF & PDF to Images**: Lossless cross-conversions.
+              - **OCR Text Extraction**: Extract full document text across all pages via MLKit / Vision with copy & share.
+            - **📱 3-Hub Material 3 Bottom Navigation**:
+              - Hub 1: **Scanner & Docs** (CamScanner document scanner, Magic Color 2.0, B&W, ID Card/Passport stitcher).
+              - Hub 2: **PDF Tools** (Adobe Acrobat Tools Suite).
+              - Hub 3: **PDF Reader** (Adobe Acrobat Reader & Editor).
+            - **🍏 Native iOS Parity**:
+              - Full SwiftUI + PDFKit implementation with 3-Hub TabView, PDF Tools, and Acrobat Reader.
+            - **🔒 100% On-Device & Privacy-First**:
+              - Zero cloud uploads, zero telemetry, zero analytics. Your documents never leave your phone!
+              - 100% Ad-Free, Subscription-Free, and Watermark-Free.
             - **🍎 Native Apple / iPhone (iOS) Port**:
               - Apple **VisionKit** document scanner with real-time yellow quadrilateral edge detection, auto-shuttering, and perspective correction.
               - **Metal GPU CoreImage** pipeline (`CIDocumentEnhancer` + `CIColorControls`) replicating CamScanner's Magic Color, B&W, and Grayscale.

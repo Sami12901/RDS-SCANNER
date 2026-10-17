@@ -16,23 +16,32 @@ import com.example.rdsscanner.ui.crop.PerspectiveCropScreen
 import com.example.rdsscanner.ui.detail.DocumentDetailScreen
 import com.example.rdsscanner.ui.home.HomeScreen
 import com.example.rdsscanner.ui.idcard.IdCardWorkflowScreen
+import com.example.rdsscanner.ui.main.MainBottomNavigation
+import androidx.compose.runtime.LaunchedEffect
+import com.example.rdsscanner.ui.pdfreader.PdfReaderScreen
 import kotlinx.coroutines.launch
 import java.io.File
 
 @Composable
-fun MainNavigation() {
+fun MainNavigation(initialPdfUri: Uri? = null) {
     val context = LocalContext.current
     val repository = remember { DocumentRepository(context) }
     val backStack = rememberNavBackStack(HomeKey)
     val coroutineScope = rememberCoroutineScope()
 
+    LaunchedEffect(initialPdfUri) {
+        if (initialPdfUri != null) {
+            backStack.add(PdfReaderKey(initialPdfUri.toString(), "Opened PDF Document"))
+        }
+    }
+
     NavDisplay(
         backStack = backStack,
         onBack = { backStack.removeLastOrNull() },
         entryProvider = entryProvider {
-            // 1. Home Screen
+            // 1. Unified 3-Hub Navigation (Scanner & Docs, PDF Tools, PDF Reader)
             entry<HomeKey> {
-                HomeScreen(
+                MainBottomNavigation(
                     repository = repository,
                     onDocumentClick = { docId ->
                         backStack.add(DetailKey(docId))
@@ -45,6 +54,9 @@ fun MainNavigation() {
                     },
                     onOpenIdCardWorkflow = { front, back, isPassport ->
                         backStack.add(IdCardWorkflowKey(front.absolutePath, back?.absolutePath, isPassport))
+                    },
+                    onOpenPdfReader = { uri, title ->
+                        backStack.add(PdfReaderKey(uri.toString(), title))
                     }
                 )
             }
@@ -54,7 +66,10 @@ fun MainNavigation() {
                 DocumentDetailScreen(
                     documentId = key.documentId,
                     repository = repository,
-                    onBack = { backStack.removeLastOrNull() }
+                    onBack = { backStack.removeLastOrNull() },
+                    onOpenPdfReader = { uri, title ->
+                        backStack.add(PdfReaderKey(uri.toString(), title))
+                    }
                 )
             }
 
@@ -124,6 +139,15 @@ fun MainNavigation() {
                         }
                         backStack.add(DetailKey(newDoc.id))
                     }
+                )
+            }
+
+            // 6. Adobe Acrobat Reader & PDF Editor Screen
+            entry<PdfReaderKey> { key ->
+                PdfReaderScreen(
+                    pdfUri = Uri.parse(key.uriString),
+                    documentTitle = key.title,
+                    onBack = { backStack.removeLastOrNull() }
                 )
             }
         }

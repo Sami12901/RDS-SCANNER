@@ -135,7 +135,8 @@ import kotlin.math.roundToInt
 fun DocumentDetailScreen(
     documentId: String,
     repository: DocumentRepository,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenPdfReader: ((Uri, String?) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -258,6 +259,27 @@ fun DocumentDetailScreen(
                         }
                     ) {
                         Icon(Icons.Default.Share, contentDescription = "Share PDF", tint = EmeraldPrimary)
+                    }
+
+                    // Open in Adobe Acrobat Reader & Markup
+                    IconButton(
+                        onClick = {
+                            isGeneratingPdf = true
+                            coroutineScope.launch {
+                                val outputFile = repository.getOutputPdfFile(currentDocument)
+                                val result = PdfGenerator.generatePdf(context, currentDocument, outputFile)
+                                isGeneratingPdf = false
+
+                                result.onSuccess { pdfFile ->
+                                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
+                                    onOpenPdfReader?.invoke(uri, "${currentDocument.title}.pdf")
+                                }.onFailure {
+                                    Toast.makeText(context, "Failed to create PDF", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = "Open in Acrobat Reader", tint = Color(0xFFE53935))
                     }
 
                     // Delete Doc

@@ -21,3 +21,9 @@ data class IdCardWorkflowKey(
     val backPath: String? = null,
     val isPassport: Boolean = false
 ) : NavKey
+
+@Serializable
+data class PdfReaderKey(
+    val uriString: String,
+    val title: String? = null
+) : NavKey
