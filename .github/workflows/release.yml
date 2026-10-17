@@ -1,0 +1,139 @@
+name: Build & Release RDS SCANNER (Android & iOS)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ==========================================
+  # Job 1: Build Android APK
+  # ==========================================
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant Execute Permission to gradlew
+        run: chmod +x gradlew
+
+      - name: Build Android Release APK
+        run: ./gradlew assembleRelease --stacktrace || ./gradlew assembleDebug --stacktrace
+
+      - name: Locate and Prepare APK
+        run: |
+          mkdir -p output_apk
+          APK_PATH=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
+          echo "Found APK at: $APK_PATH"
+          cp "$APK_PATH" output_apk/RDS-SCANNER-v1.3.0.apk
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: output_apk/RDS-SCANNER-v1.3.0.apk
+
+  # ==========================================
+  # Job 2: Build Native iOS App
+  # ==========================================
+  build-ios:
+    name: Build Native iOS App
+    runs-on: macos-14
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app || sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Build iOS Xcode Project
+        run: |
+          cd ios/RDSScanner
+          xcodebuild -project RDSScanner.xcodeproj \
+            -scheme RDSScanner \
+            -configuration Release \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Package iOS Project Source & Archive
+        run: |
+          mkdir -p output_ios
+          zip -r output_ios/RDSScanner-iOS-v1.3.0.zip ios/RDSScanner
+
+      - name: Upload iOS Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-package
+          path: output_ios/RDSScanner-iOS-v1.3.0.zip
+
+  # ==========================================
+  # Job 3: Publish GitHub Release
+  # ==========================================
+  create-release:
+    name: Publish GitHub Release
+    needs: [build-android, build-ios]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Android Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: release_assets
+
+      - name: Download iOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-package
+          path: release_assets
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: RDS SCANNER ${{ github.ref_name }} — Android & iOS Release
+          draft: false
+          prerelease: false
+          files: |
+            release_assets/RDS-SCANNER-v1.3.0.apk
+            release_assets/RDSScanner-iOS-v1.3.0.zip
+          body: |
+            ## 🚀 RDS SCANNER v1.3.0 — The Ultimate Privacy-First CamScanner Alternative
+
+            Developed with ❤️ by **[Sami12901](https://github.com/Sami12901)**.
+            
+            ### 🌟 What's New in v1.3.0:
+            - **🍎 Native Apple / iPhone (iOS) Port**:
+              - Apple **VisionKit** document scanner with real-time yellow quadrilateral edge detection, auto-shuttering, and perspective correction.
+              - **Metal GPU CoreImage** pipeline (`CIDocumentEnhancer` + `CIColorControls`) replicating CamScanner's Magic Color, B&W, and Grayscale.
+              - **Apple PencilKit** digital signature engine with Apple Pencil / finger support and pressure sensitivity.
+              - **Apple PDFKit** multi-page vector A4 PDF export with zero watermarks.
+            - **🎨 CamScanner 2.0 Magic Color on Android**:
+              - Paper white-point detection and selective whitening.
+              - Chroma-preserving ink boost ($1.25\times$) for vivid blue, red, and green signatures and stamps.
+              - Shadow-free adaptive block binarization for B&W documents.
+            - **✍️ Advanced Digital Signature Suite**:
+              - Built-in signature library to save and reuse signatures across documents.
+              - Drag-and-drop live placement with pinch/slider scaling and dynamic ink recoloring (Black, Royal Blue, Emerald Green, Ruby Red).
+            - **🔒 100% On-Device & Privacy-First**:
+              - Zero cloud uploads, zero telemetry, zero analytics. Your documents never leave your phone!
+              - 100% Ad-Free, Subscription-Free, and Watermark-Free.

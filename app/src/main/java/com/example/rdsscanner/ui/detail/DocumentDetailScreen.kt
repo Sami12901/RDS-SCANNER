@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Draw
@@ -114,6 +115,21 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import com.example.rdsscanner.ui.signature.SignatureManager
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DocumentDetailScreen(
@@ -141,6 +157,12 @@ fun DocumentDetailScreen(
     var isGeneratingPdf by remember { mutableStateOf(false) }
     var isFilterApplying by remember { mutableStateOf(false) }
     var imageUpdateVersion by remember { mutableIntStateOf(0) }
+
+    // Interactive Signature Overlay Placement State
+    var activeSignatureBmp by remember { mutableStateOf<Bitmap?>(null) }
+    var signatureOffset by remember { mutableStateOf(Offset.Zero) }
+    var signatureScale by remember { mutableFloatStateOf(0.40f) }
+    var containerBoxSize by remember { mutableStateOf(IntSize.Zero) }
 
     // Adjust sliders & live preview
     var brightnessVal by remember { mutableFloatStateOf(0f) }
@@ -254,206 +276,371 @@ fun DocumentDetailScreen(
             )
         },
         bottomBar = {
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 8.dp
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    // Filters Row
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            if (activeSignatureBmp != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 8.dp
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
                     ) {
-                        items(ScanFilter.values()) { filter ->
-                            val isSelected = currentPage?.filter == filter
-                            FilterChip(
-                                selected = isSelected,
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "✍️ Position Signature",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "(Drag on page to move)",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            // Ink Color Palette
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf(
+                                    Color(0xFF111827),
+                                    Color(0xFF0D47A1),
+                                    EmeraldPrimary,
+                                    Color(0xFFB71C1C)
+                                ).forEach { col ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(col)
+                                            .clickable {
+                                                activeSignatureBmp = SignatureManager.recolorSignature(
+                                                    activeSignatureBmp!!,
+                                                    col.toArgb()
+                                                )
+                                            }
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Size Slider
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Size:",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Slider(
+                                value = signatureScale,
+                                onValueChange = { signatureScale = it },
+                                valueRange = 0.15f..0.75f,
+                                modifier = Modifier.weight(1f),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = EmeraldPrimary,
+                                    activeTrackColor = EmeraldPrimary
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "${(signatureScale * 100).toInt()}%",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Action Buttons: Cancel & Apply
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { activeSignatureBmp = null },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Cancel")
+                            }
+
+                            Button(
                                 onClick = {
-                                    if (currentPage != null && !isFilterApplying) {
-                                        isFilterApplying = true
+                                    if (currentPage != null && activeSignatureBmp != null) {
                                         coroutineScope.launch {
                                             val pageFile = File(currentPage.imagePath)
-                                            val originalFile = File(currentPage.originalPath)
-                                            val fileToProcess = if (originalFile.exists()) originalFile else pageFile
-                                            val baseBmp = ImageProcessor.loadRotatedBitmapFromFile(fileToProcess)
-
+                                            val baseBmp = BitmapFactory.decodeFile(pageFile.absolutePath)
                                             if (baseBmp != null) {
-                                                val filtered = ImageProcessor.applyFilter(baseBmp, filter)
-                                                ImageProcessor.saveBitmapToFile(filtered, pageFile, quality = 95)
-                                                imageUpdateVersion++
+                                                val merged = Bitmap.createBitmap(baseBmp.width, baseBmp.height, Bitmap.Config.ARGB_8888)
+                                                val canvas = Canvas(merged)
+                                                canvas.drawBitmap(baseBmp, 0f, 0f, null)
 
-                                                val updatedPages = currentDocument.pages.map { p ->
-                                                    if (p.id == currentPage.id) p.copy(filter = filter) else p
-                                                }
-                                                repository.saveDocument(currentDocument.copy(pages = updatedPages))
+                                                val cW = if (containerBoxSize.width > 0) containerBoxSize.width.toFloat() else baseBmp.width.toFloat()
+                                                val cH = if (containerBoxSize.height > 0) containerBoxSize.height.toFloat() else baseBmp.height.toFloat()
+
+                                                val scale = min(cW / baseBmp.width.toFloat(), cH / baseBmp.height.toFloat())
+                                                val imgDisplayW = baseBmp.width * scale
+                                                val imgDisplayH = baseBmp.height * scale
+                                                val imgLeft = (cW - imgDisplayW) / 2f
+                                                val imgTop = (cH - imgDisplayH) / 2f
+
+                                                val sigDisplayW = imgDisplayW * signatureScale
+                                                val sigDisplayH = sigDisplayW * (activeSignatureBmp!!.height.toFloat() / activeSignatureBmp!!.width)
+
+                                                val sigCenterX = (cW / 2f) + signatureOffset.x
+                                                val sigCenterY = (cH / 2f) + signatureOffset.y
+
+                                                val sigLeft = sigCenterX - (sigDisplayW / 2f)
+                                                val sigTop = sigCenterY - (sigDisplayH / 2f)
+
+                                                val relX = (sigLeft - imgLeft) / imgDisplayW
+                                                val relY = (sigTop - imgTop) / imgDisplayH
+
+                                                val bmpSigW = (baseBmp.width * signatureScale).toInt().coerceAtLeast(10)
+                                                val bmpSigH = (bmpSigW * (activeSignatureBmp!!.height.toFloat() / activeSignatureBmp!!.width)).toInt().coerceAtLeast(10)
+                                                val bmpLeft = (relX * baseBmp.width).toInt().coerceIn(0, max(0, baseBmp.width - bmpSigW))
+                                                val bmpTop = (relY * baseBmp.height).toInt().coerceIn(0, max(0, baseBmp.height - bmpSigH))
+
+                                                val scaledSig = Bitmap.createScaledBitmap(activeSignatureBmp!!, bmpSigW, bmpSigH, true)
+                                                canvas.drawBitmap(scaledSig, bmpLeft.toFloat(), bmpTop.toFloat(), null)
+
+                                                ImageProcessor.saveBitmapToFile(merged, pageFile, quality = 95)
+                                                activeSignatureBmp = null
+                                                imageUpdateVersion++
                                                 refreshDoc()
+                                                Toast.makeText(context, "Signature applied successfully!", Toast.LENGTH_SHORT).show()
                                             }
-                                            isFilterApplying = false
                                         }
                                     }
                                 },
-                                label = { Text(filter.displayName, fontSize = 11.sp) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = EmeraldPrimary.copy(alpha = 0.2f),
-                                    selectedLabelColor = EmeraldPrimary
-                                )
-                            )
+                                modifier = Modifier.weight(1.3f),
+                                colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Apply Signature", color = Color.White)
+                            }
                         }
                     }
+                }
+            } else {
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 8.dp
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        // Filters Row
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(ScanFilter.values()) { filter ->
+                                val isSelected = currentPage?.filter == filter
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        if (currentPage != null && !isFilterApplying) {
+                                            isFilterApplying = true
+                                            coroutineScope.launch {
+                                                val origFile = repository.ensureOriginalBackup(currentDocument.id, currentPage)
+                                                val pageFile = File(currentPage.imagePath)
+                                                val baseBmp = ImageProcessor.loadRotatedBitmapFromFile(origFile)
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                                                if (baseBmp != null) {
+                                                    if (filter == ScanFilter.ORIGINAL) {
+                                                        origFile.copyTo(pageFile, overwrite = true)
+                                                    } else {
+                                                        val filtered = ImageProcessor.applyFilter(baseBmp, filter)
+                                                        ImageProcessor.saveBitmapToFile(filtered, pageFile, quality = 95)
+                                                    }
+                                                    imageUpdateVersion++
 
-                    // Toolbar actions
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Adjust Sliders
-                        ActionItem(
-                            icon = Icons.Default.Tune,
-                            label = "Adjust",
-                            onClick = { showAdjustSheet = true }
-                        )
-
-                        // Rotate
-                        ActionItem(
-                            icon = Icons.Default.RotateRight,
-                            label = "Rotate",
-                            onClick = {
-                                if (currentPage != null) {
-                                    coroutineScope.launch {
-                                        repository.rotatePage(currentDocument.id, currentPage.id)
-                                        imageUpdateVersion++
-                                        refreshDoc()
-                                    }
-                                }
+                                                    val updatedPages = currentDocument.pages.map { p ->
+                                                        if (p.id == currentPage.id) p.copy(filter = filter) else p
+                                                    }
+                                                    repository.saveDocument(currentDocument.copy(pages = updatedPages))
+                                                    refreshDoc()
+                                                }
+                                                isFilterApplying = false
+                                            }
+                                        }
+                                    },
+                                    label = { Text(filter.displayName, fontSize = 11.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = EmeraldPrimary.copy(alpha = 0.2f),
+                                        selectedLabelColor = EmeraldPrimary
+                                    )
+                                )
                             }
-                        )
+                        }
 
-                        // OCR
-                        ActionItem(
-                            icon = Icons.Default.TextFields,
-                            label = "OCR (Text)",
-                            onClick = {
-                                if (currentPage != null) {
-                                    isOcrRunning = true
-                                    coroutineScope.launch {
-                                        val result = OcrHelper.recognizeTextFromFile(File(currentPage.imagePath))
-                                        isOcrRunning = false
-                                        result.onSuccess { text ->
-                                            ocrResultText = text
-                                            showOcrDialog = true
-                                            repository.updatePageOcrText(currentDocument.id, currentPage.id, text)
-                                        }.onFailure {
-                                            Toast.makeText(context, "OCR failed: ${it.message}", Toast.LENGTH_SHORT).show()
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Toolbar actions
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceAround,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Adjust Sliders
+                            ActionItem(
+                                icon = Icons.Default.Tune,
+                                label = "Adjust",
+                                onClick = { showAdjustSheet = true }
+                            )
+
+                            // Rotate
+                            ActionItem(
+                                icon = Icons.Default.RotateRight,
+                                label = "Rotate",
+                                onClick = {
+                                    if (currentPage != null) {
+                                        coroutineScope.launch {
+                                            repository.rotatePage(currentDocument.id, currentPage.id)
+                                            imageUpdateVersion++
+                                            refreshDoc()
                                         }
                                     }
                                 }
-                            }
-                        )
+                            )
 
-                        // Sign
-                        ActionItem(
-                            icon = Icons.Default.Draw,
-                            label = "Signature",
-                            onClick = { showSignatureDialog = true }
-                        )
+                            // OCR
+                            ActionItem(
+                                icon = Icons.Default.TextFields,
+                                label = "OCR (Text)",
+                                onClick = {
+                                    if (currentPage != null) {
+                                        isOcrRunning = true
+                                        coroutineScope.launch {
+                                            val result = OcrHelper.recognizeTextFromFile(File(currentPage.imagePath))
+                                            isOcrRunning = false
+                                            result.onSuccess { text ->
+                                                ocrResultText = text
+                                                showOcrDialog = true
+                                                repository.updatePageOcrText(currentDocument.id, currentPage.id, text)
+                                            }.onFailure {
+                                                Toast.makeText(context, "OCR failed: ${it.message}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                }
+                            )
 
-                        // Reorder Page Left
-                        ActionItem(
-                            icon = Icons.Default.ArrowBack,
-                            label = "Move Left",
+                            // Sign
+                            ActionItem(
+                                icon = Icons.Default.Draw,
+                                label = "Signature",
+                                onClick = { showSignatureDialog = true }
+                            )
+
+                            // Reorder Page Left
+                            ActionItem(
+                                icon = Icons.Default.ArrowBack,
+                                label = "Move Left",
+                                onClick = {
+                                    if (selectedPageIndex > 0) {
+                                        val pages = currentDocument.pages.toMutableList()
+                                        val item = pages.removeAt(selectedPageIndex)
+                                        pages.add(selectedPageIndex - 1, item)
+                                        coroutineScope.launch {
+                                            repository.saveDocument(currentDocument.copy(pages = pages))
+                                            selectedPageIndex--
+                                            refreshDoc()
+                                        }
+                                    }
+                                }
+                            )
+
+                            // Reorder Page Right
+                            ActionItem(
+                                icon = Icons.Default.ArrowForward,
+                                label = "Move Right",
+                                onClick = {
+                                    if (selectedPageIndex < currentDocument.pages.size - 1) {
+                                        val pages = currentDocument.pages.toMutableList()
+                                        val item = pages.removeAt(selectedPageIndex)
+                                        pages.add(selectedPageIndex + 1, item)
+                                        coroutineScope.launch {
+                                            repository.saveDocument(currentDocument.copy(pages = pages))
+                                            selectedPageIndex++
+                                            refreshDoc()
+                                        }
+                                    }
+                                }
+                            )
+
+                            // Delete Page
+                            ActionItem(
+                                icon = Icons.Default.Delete,
+                                label = "Delete",
+                                isDestructive = true,
+                                onClick = {
+                                    if (currentPage != null) {
+                                        coroutineScope.launch {
+                                            repository.deletePage(currentDocument.id, currentPage.id)
+                                            refreshDoc()
+                                        }
+                                    }
+                                }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Big PDF Export Button
+                        Button(
                             onClick = {
-                                if (selectedPageIndex > 0) {
-                                    val pages = currentDocument.pages.toMutableList()
-                                    val item = pages.removeAt(selectedPageIndex)
-                                    pages.add(selectedPageIndex - 1, item)
-                                    coroutineScope.launch {
-                                        repository.saveDocument(currentDocument.copy(pages = pages))
-                                        selectedPageIndex--
-                                        refreshDoc()
+                                isGeneratingPdf = true
+                                coroutineScope.launch {
+                                    val outputFile = repository.getOutputPdfFile(currentDocument)
+                                    val customSettings = PdfSettings(
+                                        pageSize = pdfPageSize,
+                                        compression = pdfCompression,
+                                        includePageNumbers = pdfPageNumbering,
+                                        watermarkText = if (pdfWatermarkText.isNotBlank()) pdfWatermarkText else null
+                                    )
+                                    val result = PdfGenerator.generatePdf(context, currentDocument, outputFile, customSettings)
+                                    isGeneratingPdf = false
+
+                                    result.onSuccess { pdfFile ->
+                                        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
+                                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                            putExtra(Intent.EXTRA_STREAM, uri)
+                                            type = "application/pdf"
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(Intent.createChooser(sendIntent, "Open / Share PDF"))
+                                    }.onFailure {
+                                        Toast.makeText(context, "PDF compilation failed", Toast.LENGTH_SHORT).show()
                                     }
                                 }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            if (isGeneratingPdf) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Compiling PDF...", color = Color.White)
+                            } else {
+                                Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color.White)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Export Clean PDF (No Watermark)", color = Color.White, fontWeight = FontWeight.Bold)
                             }
-                        )
-
-                        // Reorder Page Right
-                        ActionItem(
-                            icon = Icons.Default.ArrowForward,
-                            label = "Move Right",
-                            onClick = {
-                                if (selectedPageIndex < currentDocument.pages.size - 1) {
-                                    val pages = currentDocument.pages.toMutableList()
-                                    val item = pages.removeAt(selectedPageIndex)
-                                    pages.add(selectedPageIndex + 1, item)
-                                    coroutineScope.launch {
-                                        repository.saveDocument(currentDocument.copy(pages = pages))
-                                        selectedPageIndex++
-                                        refreshDoc()
-                                    }
-                                }
-                            }
-                        )
-
-                        // Delete Page
-                        ActionItem(
-                            icon = Icons.Default.Delete,
-                            label = "Delete",
-                            isDestructive = true,
-                            onClick = {
-                                if (currentPage != null) {
-                                    coroutineScope.launch {
-                                        repository.deletePage(currentDocument.id, currentPage.id)
-                                        refreshDoc()
-                                    }
-                                }
-                            }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Big PDF Export Button
-                    Button(
-                        onClick = {
-                            isGeneratingPdf = true
-                            coroutineScope.launch {
-                                val outputFile = repository.getOutputPdfFile(currentDocument)
-                                val customSettings = PdfSettings(
-                                    pageSize = pdfPageSize,
-                                    compression = pdfCompression,
-                                    includePageNumbers = pdfPageNumbering,
-                                    watermarkText = if (pdfWatermarkText.isNotBlank()) pdfWatermarkText else null
-                                )
-                                val result = PdfGenerator.generatePdf(context, currentDocument, outputFile, customSettings)
-                                isGeneratingPdf = false
-
-                                result.onSuccess { pdfFile ->
-                                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
-                                    val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                                        putExtra(Intent.EXTRA_STREAM, uri)
-                                        type = "application/pdf"
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    context.startActivity(Intent.createChooser(sendIntent, "Open / Share PDF"))
-                                }.onFailure {
-                                    Toast.makeText(context, "PDF compilation failed", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        if (isGeneratingPdf) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Compiling PDF...", color = Color.White)
-                        } else {
-                            Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color.White)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Export Clean PDF (No Watermark)", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -482,7 +669,14 @@ fun DocumentDetailScreen(
                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .onGloballyPositioned { coordinates ->
+                                    containerBoxSize = coordinates.size
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
                             val mainImageRequest = remember(currentPage.imagePath, imageUpdateVersion, currentPage.filter) {
                                 ImageRequest.Builder(context)
                                     .data(File(currentPage.imagePath))
@@ -500,6 +694,56 @@ fun DocumentDetailScreen(
                                     .rotate(currentPage.rotationDegrees.toFloat()),
                                 contentScale = ContentScale.Fit
                             )
+
+                            // Interactive Signature Overlay when active
+                            if (activeSignatureBmp != null) {
+                                val sigBmp = activeSignatureBmp!!
+                                val cW = if (containerBoxSize.width > 0) containerBoxSize.width.toFloat() else 400f
+                                val sigDisplayW = cW * signatureScale
+                                val sigDisplayH = sigDisplayW * (sigBmp.height.toFloat() / sigBmp.width)
+
+                                Box(
+                                    modifier = Modifier
+                                        .offset { IntOffset(signatureOffset.x.roundToInt(), signatureOffset.y.roundToInt()) }
+                                        .size(
+                                            width = (sigDisplayW / LocalDensity.current.density).dp,
+                                            height = (sigDisplayH / LocalDensity.current.density).dp
+                                        )
+                                        .border(2.dp, EmeraldPrimary, RoundedCornerShape(8.dp))
+                                        .background(EmeraldPrimary.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                        .pointerInput(Unit) {
+                                            detectDragGestures { change, dragAmount ->
+                                                change.consume()
+                                                signatureOffset = Offset(
+                                                    signatureOffset.x + dragAmount.x,
+                                                    signatureOffset.y + dragAmount.y
+                                                )
+                                            }
+                                        }
+                                ) {
+                                    Image(
+                                        bitmap = sigBmp.asImageBitmap(),
+                                        contentDescription = "Movable Signature",
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(4.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                    Surface(
+                                        color = EmeraldPrimary,
+                                        shape = RoundedCornerShape(bottomEnd = 6.dp),
+                                        modifier = Modifier.align(Alignment.TopStart)
+                                    ) {
+                                        Text(
+                                            text = "✍️ Drag to place",
+                                            color = Color.White,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
 
                             // Page Counter Pill
                             Surface(
@@ -603,10 +847,8 @@ fun DocumentDetailScreen(
 
     LaunchedEffect(showAdjustSheet, currentPage) {
         if (showAdjustSheet && currentPage != null) {
-            val pageFile = File(currentPage.imagePath)
-            val originalFile = File(currentPage.originalPath)
-            val fileToProcess = if (originalFile.exists()) originalFile else pageFile
-            adjustBaseBmp = ImageProcessor.loadRotatedBitmapFromFile(fileToProcess)
+            val origFile = repository.ensureOriginalBackup(currentDocument.id, currentPage)
+            adjustBaseBmp = ImageProcessor.loadRotatedBitmapFromFile(origFile)
             adjustPreviewBmp = adjustBaseBmp
         } else {
             adjustBaseBmp = null
@@ -823,27 +1065,9 @@ fun DocumentDetailScreen(
         SignatureDialog(
             onDismiss = { showSignatureDialog = false },
             onSignatureCaptured = { signatureBmp ->
-                coroutineScope.launch {
-                    val pageFile = File(currentPage.imagePath)
-                    val baseBmp = BitmapFactory.decodeFile(pageFile.absolutePath)
-                    if (baseBmp != null) {
-                        val merged = Bitmap.createBitmap(baseBmp.width, baseBmp.height, Bitmap.Config.ARGB_8888)
-                        val canvas = Canvas(merged)
-                        canvas.drawBitmap(baseBmp, 0f, 0f, null)
-
-                        val sigWidth = (baseBmp.width * 0.35f).toInt()
-                        val sigHeight = (sigWidth * (signatureBmp.height.toFloat() / signatureBmp.width)).toInt()
-                        val scaledSig = Bitmap.createScaledBitmap(signatureBmp, sigWidth, sigHeight, true)
-
-                        val left = baseBmp.width - sigWidth - (baseBmp.width * 0.05f)
-                        val top = baseBmp.height - sigHeight - (baseBmp.height * 0.05f)
-                        canvas.drawBitmap(scaledSig, left, top, null)
-
-                        ImageProcessor.saveBitmapToFile(merged, pageFile, quality = 95)
-                        refreshDoc()
-                        Toast.makeText(context, "Signature stamped on page!", Toast.LENGTH_SHORT).show()
-                    }
-                }
+                activeSignatureBmp = signatureBmp
+                signatureOffset = Offset.Zero
+                showSignatureDialog = false
             }
         )
     }

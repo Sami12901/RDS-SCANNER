@@ -5,31 +5,33 @@
 </p>
 
 <p align="center">
-  <b>A Privacy-First, 100% Free & Open-Source CamScanner Alternative for Android</b><br>
+  <b>A Privacy-First, 100% Free & Open-Source CamScanner Alternative for Android & Apple iOS</b><br>
   <i>Developed with ❤️ by <b><a href="https://github.com/Sami12901">Sami</a></b></i>
 </p>
 
 <p align="center">
   <a href="https://github.com/Sami12901/RDS-SCANNER/releases/latest"><img src="https://img.shields.io/github/v/release/Sami12901/RDS-SCANNER?color=00A86B&style=flat-square" alt="Latest Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square" alt="License" /></a>
-  <img src="https://img.shields.io/badge/Platform-Android_7.0+-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform" />
-  <img src="https://img.shields.io/badge/Kotlin-2.2+-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin" />
-  <img src="https://img.shields.io/badge/UI-Jetpack_Compose_Material_3-4285F4?style=flat-square" alt="Compose" />
+  <img src="https://img.shields.io/badge/Platform-Android_&_iOS_(Apple)-3DDC84?style=flat-square&logo=apple&logoColor=white" alt="Platform" />
+  <img src="https://img.shields.io/badge/Android-Kotlin_Compose-7F52FF?style=flat-square&logo=android&logoColor=white" alt="Android" />
+  <img src="https://img.shields.io/badge/iOS-Swift_SwiftUI-F05138?style=flat-square&logo=swift&logoColor=white" alt="iOS" />
   <img src="https://img.shields.io/badge/Privacy-100%25_On--Device-success?style=flat-square" alt="Privacy" />
   <img src="https://img.shields.io/badge/Ads-Zero_Ads-brightgreen?style=flat-square" alt="No Ads" />
 </p>
 
 ---
 
-## 📥 Download RDS SCANNER APK
+## 📥 Download RDS SCANNER (v1.3.0)
 
-Get the latest version directly for your Android phone:
+Get the latest release for your phone:
 
 <p align="center">
-  <a href="https://github.com/Sami12901/RDS-SCANNER/releases/download/v1.2.0/RDS-SCANNER-v1.2.0.apk">
-    <img src="https://img.shields.io/badge/Download_APK-v1.2.0_(23.2_MB)-00A86B?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" />
+  <a href="https://github.com/Sami12901/RDS-SCANNER/releases/download/v1.3.0/RDS-SCANNER-v1.3.0.apk">
+    <img src="https://img.shields.io/badge/Download_Android_APK-v1.3.0_(23.3_MB)-00A86B?style=for-the-badge&logo=android&logoColor=white" alt="Download Android APK" />
   </a>
 </p>
+
+> 🍏 **iPhone Users**: Download the native iOS package `RDSScanner-iOS-v1.3.0.zip` from the **[Releases Page](https://github.com/Sami12901/RDS-SCANNER/releases)** and run with Xcode, or install via TestFlight / Sideloadly.
 
 > Or view all release files on the **[Releases Page](https://github.com/Sami12901/RDS-SCANNER/releases)**.
 
@@ -119,22 +121,30 @@ RDS SCANNER Architecture
 - JDK 17 or JDK 21 (bundled in Android Studio)
 - Android SDK (API 24 to 36)
 
-### Clone & Build
+### 🤖 Android Build
 ```bash
 # Clone the repository
 git clone https://github.com/Sami12901/RDS-SCANNER.git
 cd RDS-SCANNER
 
-# Build debug APK
+# Build debug or release APK
 ./gradlew assembleDebug
 
 # Output APK path:
-# app/build/outputs/apk/debug/app-debug.apk
+# release/RDS-SCANNER-v1.3.0.apk
 ```
 
-### Install via ADB:
+### 🍏 Apple / iPhone (iOS) Build
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+# Open Xcode project on macOS
+open ios/RDSScanner/RDSScanner.xcodeproj
+
+# Or build via terminal:
+xcodebuild -project ios/RDSScanner/RDSScanner.xcodeproj \
+  -scheme RDSScanner \
+  -configuration Release \
+  -sdk iphoneos \
+  build
 ```
 
 ---

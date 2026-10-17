@@ -231,14 +231,19 @@ fun HomeScreen(
                             )
                         }
                         Spacer(modifier = Modifier.width(10.dp))
-                        Column {
+                        val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                        Column(
+                            modifier = Modifier.clickable {
+                                uriHandler.openUri("https://github.com/Sami12901")
+                            }
+                        ) {
                             Text(
                                 text = "RDS SCANNER",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp
                             )
                             Text(
-                                text = "Develop by Sami • Open Source",
+                                text = "Develop by Sami • Open Source ↗",
                                 fontSize = 11.sp,
                                 color = EmeraldPrimary,
                                 fontWeight = FontWeight.SemiBold

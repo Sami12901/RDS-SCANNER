@@ -145,9 +145,16 @@ class DocumentRepository(private val context: Context) {
 
         val pages = uris.mapIndexed { index, uri ->
             val pageId = UUID.randomUUID().toString()
+            val origFile = File(docFolder, "orig_${index + 1}_$pageId.jpg")
             val targetFile = File(docFolder, "page_${index + 1}_$pageId.jpg")
-            copyUriToFile(uri, targetFile)
-            ScanPage(id = pageId, imagePath = targetFile.absolutePath)
+            copyUriToFile(uri, origFile)
+            origFile.copyTo(targetFile, overwrite = true)
+            ScanPage(
+                id = pageId,
+                imagePath = targetFile.absolutePath,
+                originalPath = origFile.absolutePath,
+                filter = ScanFilter.ORIGINAL
+            )
         }
 
         val newDoc = ScannedDocument(
@@ -162,6 +169,32 @@ class DocumentRepository(private val context: Context) {
         _documents.value = listOf(newDoc) + _documents.value
         persistDocuments()
         newDoc
+    }
+
+    suspend fun ensureOriginalBackup(docId: String, page: ScanPage): File = withContext(Dispatchers.IO) {
+        val origFile = File(page.originalPath)
+        val imageFile = File(page.imagePath)
+        if (!origFile.exists() || origFile.absolutePath == imageFile.absolutePath) {
+            val docFolder = File(documentsDir, docId).apply { mkdirs() }
+            val newOrigFile = File(docFolder, "orig_${page.id}.jpg")
+            if (imageFile.exists()) {
+                imageFile.copyTo(newOrigFile, overwrite = true)
+            }
+            val current = _documents.value.toMutableList()
+            val docIndex = current.indexOfFirst { it.id == docId }
+            if (docIndex != -1) {
+                val doc = current[docIndex]
+                val updatedPages = doc.pages.map { p ->
+                    if (p.id == page.id) p.copy(originalPath = newOrigFile.absolutePath) else p
+                }
+                current[docIndex] = doc.copy(pages = updatedPages)
+                _documents.value = current
+                persistDocuments()
+            }
+            newOrigFile
+        } else {
+            origFile
+        }
     }
 
     suspend fun saveDocument(doc: ScannedDocument) = withContext(Dispatchers.IO) {
@@ -211,7 +244,10 @@ class DocumentRepository(private val context: Context) {
         if (docIndex != -1) {
             val doc = current[docIndex]
             val pageToDelete = doc.pages.find { it.id == pageId }
-            pageToDelete?.let { File(it.imagePath).delete() }
+            pageToDelete?.let {
+                File(it.imagePath).delete()
+                File(it.originalPath).delete()
+            }
 
             val updatedPages = doc.pages.filter { it.id != pageId }
             if (updatedPages.isEmpty()) {

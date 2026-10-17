@@ -26,154 +26,210 @@ object ImageProcessor {
         when (filter) {
             ScanFilter.ORIGINAL -> srcBitmap
             ScanFilter.MAGIC_COLOR -> toMagicColor(srcBitmap)
-            ScanFilter.BW_DOCUMENT -> toBlackAndWhite(srcBitmap, offset = 0)
-            ScanFilter.BW_TEXT -> toBlackAndWhite(srcBitmap, offset = 14)
+            ScanFilter.BW_DOCUMENT -> toBlackAndWhite(srcBitmap, offset = 10)
+            ScanFilter.BW_TEXT -> toBlackAndWhite(srcBitmap, offset = 18)
             ScanFilter.GRAYSCALE -> toGrayscale(srcBitmap)
             ScanFilter.LIGHTEN -> toLighten(srcBitmap)
         }
     }
 
     private fun toGrayscale(src: Bitmap): Bitmap {
-        val output = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(output)
-        
-        val contrast = 1.35f
-        val brightness = 20f
-        val translate = (-0.5f * contrast + 0.5f) * 255f + brightness
-
-        val cm = ColorMatrix().apply {
-            setSaturation(0f)
-            val contrastMatrix = ColorMatrix(
-                floatArrayOf(
-                    contrast, 0f, 0f, 0f, translate,
-                    0f, contrast, 0f, 0f, translate,
-                    0f, 0f, contrast, 0f, translate,
-                    0f, 0f, 0f, 1f, 0f
-                )
-            )
-            postConcat(contrastMatrix)
-        }
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            isFilterBitmap = true
-            colorFilter = ColorMatrixColorFilter(cm)
-        }
-        canvas.drawBitmap(src, 0f, 0f, paint)
-        return output
-    }
-
-    /**
-     * CamScanner signature Magic Color filter:
-     * Centers contrast around 128 mid-tone with background whitening translation
-     * and boosts color saturation to 1.35x for vibrant stamps, signatures, and deep ink.
-     */
-    private fun toMagicColor(src: Bitmap): Bitmap {
-        val output = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(output)
-
-        val contrast = 1.6f
-        val brightness = 42f
-        // Centered contrast formula: (R - 128) * contrast + 128 + brightness
-        val translate = (-0.5f * contrast + 0.5f) * 255f + brightness
-
-        val contrastMatrix = ColorMatrix(
-            floatArrayOf(
-                contrast, 0f, 0f, 0f, translate,
-                0f, contrast, 0f, 0f, translate,
-                0f, 0f, contrast, 0f, translate,
-                0f, 0f, 0f, 1f, 0f
-            )
-        )
-        val saturationMatrix = ColorMatrix().apply { setSaturation(1.35f) }
-        contrastMatrix.postConcat(saturationMatrix)
-
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            isFilterBitmap = true
-            colorFilter = ColorMatrixColorFilter(contrastMatrix)
-        }
-        canvas.drawBitmap(src, 0f, 0f, paint)
-        return output
-    }
-
-    private fun toLighten(src: Bitmap): Bitmap {
-        val output = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(output)
-        val contrast = 1.15f
-        val brightness = 45f
-        val translate = (-0.5f * contrast + 0.5f) * 255f + brightness
-        val cm = ColorMatrix(
-            floatArrayOf(
-                contrast, 0f, 0f, 0f, translate,
-                0f, contrast, 0f, 0f, translate,
-                0f, 0f, contrast, 0f, translate,
-                0f, 0f, 0f, 1f, 0f
-            )
-        )
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            isFilterBitmap = true
-            colorFilter = ColorMatrixColorFilter(cm)
-        }
-        canvas.drawBitmap(src, 0f, 0f, paint)
-        return output
-    }
-
-    /**
-     * Otsu Adaptive Binarization for razor-sharp Black & White document scanning
-     * across different ambient lighting conditions and shadows.
-     */
-    private fun toBlackAndWhite(src: Bitmap, offset: Int = 0): Bitmap {
         val width = src.width
         val height = src.height
         val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val pixels = IntArray(width * height)
         src.getPixels(pixels, 0, width, 0, 0, width, height)
 
-        // 1. Build luminance histogram
-        val histogram = IntArray(256)
         for (i in pixels.indices) {
+            val c = pixels[i]
+            val a = (c shr 24) and 0xFF
+            val r = (c shr 16) and 0xFF
+            val g = (c shr 8) and 0xFF
+            val b = c and 0xFF
+            val lum = (299 * r + 587 * g + 114 * b) / 1000
+
+            val contrast = 1.3f
+            val brightened = ((lum - 128) * contrast + 128 + 24).toInt().coerceIn(0, 255)
+            val finalL = if (brightened >= 242) 255 else brightened
+            pixels[i] = (a shl 24) or (finalL shl 16) or (finalL shl 8) or finalL
+        }
+        output.setPixels(pixels, 0, width, 0, 0, width, height)
+        return output
+    }
+
+    /**
+     * CamScanner Magic Color 2.0:
+     * - Automatic paper background detection & whitening (cleans gray/yellow paper cast)
+     * - Deep ink text contrast enhancement
+     * - Color vibrancy preservation for stamps, blue ink, colored headers without highlight blowout
+     */
+    private fun toMagicColor(src: Bitmap): Bitmap {
+        val width = src.width
+        val height = src.height
+        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val pixels = IntArray(width * height)
+        src.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        // 1. Build luminance histogram from a distributed sample
+        val hist = IntArray(256)
+        val sampleStep = max(1, (width * height) / 50000)
+        var sampledCount = 0
+        for (i in pixels.indices step sampleStep) {
             val c = pixels[i]
             val r = (c shr 16) and 0xFF
             val g = (c shr 8) and 0xFF
             val b = c and 0xFF
-            val lum = (0.299f * r + 0.587f * g + 0.114f * b).toInt().coerceIn(0, 255)
-            histogram[lum]++
+            val lum = (299 * r + 587 * g + 114 * b) / 1000
+            hist[lum]++
+            sampledCount++
         }
 
-        // 2. Compute Otsu optimal threshold
-        val total = pixels.size
-        var sum = 0.0
-        for (t in 0..255) sum += t * histogram[t]
+        // Find black point (~5th percentile) and paper white point (~88th percentile)
+        var count = 0
+        var blackPoint = 30
+        var whitePoint = 220
+        val targetBlack = (sampledCount * 0.05).toInt()
+        val targetWhite = (sampledCount * 0.88).toInt()
 
-        var sumB = 0.0
-        var wB = 0
-        var varMax = 0.0
-        var otsuThreshold = 128
+        for (i in 0..255) {
+            count += hist[i]
+            if (count >= targetBlack && blackPoint == 30) {
+                blackPoint = i.coerceIn(10, 75)
+            }
+            if (count >= targetWhite) {
+                whitePoint = i.coerceIn(160, 245)
+                break
+            }
+        }
+        val range = max(1, whitePoint - blackPoint).toFloat()
 
-        for (t in 0..255) {
-            wB += histogram[t]
-            if (wB == 0) continue
-            val wF = total - wB
-            if (wF == 0) break
+        // S-curve tone mapping LUT
+        val lut = IntArray(256)
+        for (i in 0..255) {
+            val norm = ((i - blackPoint) / range).coerceIn(0f, 1f)
+            val curved = if (norm > 0.72f) {
+                0.72f + (norm - 0.72f) * (0.28f / 0.28f) * 1.15f
+            } else if (norm < 0.25f) {
+                norm * 0.85f
+            } else {
+                norm
+            }
+            lut[i] = (curved.coerceIn(0f, 1f) * 255f).toInt()
+        }
 
-            sumB += t * histogram[t]
-            val mB = sumB / wB
-            val mF = (sum - sumB) / wF
-            val varBetween = wB.toDouble() * wF.toDouble() * (mB - mF) * (mB - mF)
-            if (varBetween > varMax) {
-                varMax = varBetween
-                otsuThreshold = t
+        // 2. Process pixels with chroma-preserving ink vibrancy
+        val hsv = FloatArray(3)
+        for (i in pixels.indices) {
+            val c = pixels[i]
+            val a = (c shr 24) and 0xFF
+            val r = (c shr 16) and 0xFF
+            val g = (c shr 8) and 0xFF
+            val b = c and 0xFF
+
+            val maxC = max(r, max(g, b))
+            val minC = min(r, min(g, b))
+            val delta = maxC - minC
+            val lum = (299 * r + 587 * g + 114 * b) / 1000
+
+            // If pixel is nearly neutral (paper background or black/gray text)
+            if (delta < 18 || maxC < 40) {
+                val newL = lut[lum]
+                val finalL = if (newL >= 236) 255 else newL
+                pixels[i] = (a shl 24) or (finalL shl 16) or (finalL shl 8) or finalL
+            } else {
+                // Colored pixel (stamps, signatures, colored text/logos)
+                val scale = lut[lum].toFloat() / max(1, lum).toFloat()
+                val newR = (r * scale).toInt().coerceIn(0, 255)
+                val newG = (g * scale).toInt().coerceIn(0, 255)
+                val newB = (b * scale).toInt().coerceIn(0, 255)
+
+                Color.colorToHSV((a shl 24) or (newR shl 16) or (newG shl 8) or newB, hsv)
+                hsv[1] = (hsv[1] * 1.25f).coerceIn(0f, 1f)
+                pixels[i] = Color.HSVToColor(a, hsv)
             }
         }
 
-        val finalThreshold = (otsuThreshold + offset).coerceIn(80, 195)
+        output.setPixels(pixels, 0, width, 0, 0, width, height)
+        return output
+    }
 
-        // 3. Threshold pixels
+    private fun toLighten(src: Bitmap): Bitmap {
+        val width = src.width
+        val height = src.height
+        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val pixels = IntArray(width * height)
+        src.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        for (i in pixels.indices) {
+            val c = pixels[i]
+            val a = (c shr 24) and 0xFF
+            val r = (c shr 16) and 0xFF
+            val g = (c shr 8) and 0xFF
+            val b = c and 0xFF
+            val newR = (r + 38 * (1f - r / 255f)).toInt().coerceIn(0, 255)
+            val newG = (g + 38 * (1f - g / 255f)).toInt().coerceIn(0, 255)
+            val newB = (b + 38 * (1f - b / 255f)).toInt().coerceIn(0, 255)
+            pixels[i] = (a shl 24) or (newR shl 16) or (newG shl 8) or newB
+        }
+        output.setPixels(pixels, 0, width, 0, 0, width, height)
+        return output
+    }
+
+    /**
+     * Adaptive Local Window Binarization:
+     * Eliminates shadow gradients across documents (no dark blob corners)
+     * and produces razor-sharp monochrome text for printing.
+     */
+    private fun toBlackAndWhite(src: Bitmap, offset: Int = 10): Bitmap {
+        val width = src.width
+        val height = src.height
+        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val pixels = IntArray(width * height)
+        src.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        val lum = IntArray(width * height)
         for (i in pixels.indices) {
             val c = pixels[i]
             val r = (c shr 16) and 0xFF
             val g = (c shr 8) and 0xFF
             val b = c and 0xFF
-            val luminance = (0.299f * r + 0.587f * g + 0.114f * b).toInt()
-            pixels[i] = if (luminance > finalThreshold) Color.WHITE else Color.BLACK
+            lum[i] = (299 * r + 587 * g + 114 * b) / 1000
+        }
+
+        // Fast block-based local thresholding
+        val blockSize = 32
+        val blocksX = (width + blockSize - 1) / blockSize
+        val blocksY = (height + blockSize - 1) / blockSize
+        val blockMeans = IntArray(blocksX * blocksY)
+
+        for (by in 0 until blocksY) {
+            val startY = by * blockSize
+            val endY = min(height, startY + blockSize)
+            for (bx in 0 until blocksX) {
+                val startX = bx * blockSize
+                val endX = min(width, startX + blockSize)
+                var sum = 0
+                var count = 0
+                for (y in startY until endY) {
+                    val rowOffset = y * width
+                    for (x in startX until endX) {
+                        sum += lum[rowOffset + x]
+                        count++
+                    }
+                }
+                blockMeans[by * blocksX + bx] = if (count > 0) sum / count else 128
+            }
+        }
+
+        for (y in 0 until height) {
+            val by = (y / blockSize).coerceIn(0, blocksY - 1)
+            val rowOffset = y * width
+            for (x in 0 until width) {
+                val bx = (x / blockSize).coerceIn(0, blocksX - 1)
+                val localMean = blockMeans[by * blocksX + bx]
+                val threshold = (localMean - offset).coerceIn(40, 230)
+                pixels[rowOffset + x] = if (lum[rowOffset + x] > threshold) Color.WHITE else Color.BLACK
+            }
         }
 
         output.setPixels(pixels, 0, width, 0, 0, width, height)

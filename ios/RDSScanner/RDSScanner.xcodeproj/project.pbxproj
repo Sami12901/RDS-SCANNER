@@ -1,0 +1,357 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AA1000012C1B100100000001 /* RDSScannerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000112C1B100100000001 /* RDSScannerApp.swift */; };
+		AA1000022C1B100100000002 /* ScannedDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000122C1B100100000002 /* ScannedDocument.swift */; };
+		AA1000032C1B100100000003 /* DocumentStorageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000132C1B100100000003 /* DocumentStorageManager.swift */; };
+		AA1000042C1B100100000004 /* ImageProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000142C1B100100000004 /* ImageProcessor.swift */; };
+		AA1000052C1B100100000005 /* DocumentScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000152C1B100100000005 /* DocumentScannerView.swift */; };
+		AA1000062C1B100100000006 /* SignatureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000162C1B100100000006 /* SignatureManager.swift */; };
+		AA1000072C1B100100000007 /* SignatureCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000172C1B100100000007 /* SignatureCanvasView.swift */; };
+		AA1000082C1B100100000008 /* SignatureOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000182C1B100100000008 /* SignatureOverlayView.swift */; };
+		AA1000092C1B100100000009 /* PDFManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000192C1B100100000009 /* PDFManager.swift */; };
+		AA10000A2C1B10010000000A /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10001A2C1B10010000000A /* HomeView.swift */; };
+		AA10000B2C1B10010000000B /* DocumentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10001B2C1B10010000000B /* DocumentDetailView.swift */; };
+		AA10000C2C1B10010000000C /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10001C2C1B10010000000C /* AboutView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		AA1000102C1B100100000000 /* RDSScanner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RDSScanner.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA1000112C1B100100000001 /* RDSScannerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDSScannerApp.swift; sourceTree = "<group>"; };
+		AA1000122C1B100100000002 /* ScannedDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScannedDocument.swift; sourceTree = "<group>"; };
+		AA1000132C1B100100000003 /* DocumentStorageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentStorageManager.swift; sourceTree = "<group>"; };
+		AA1000142C1B100100000004 /* ImageProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProcessor.swift; sourceTree = "<group>"; };
+		AA1000152C1B100100000005 /* DocumentScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentScannerView.swift; sourceTree = "<group>"; };
+		AA1000162C1B100100000006 /* SignatureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureManager.swift; sourceTree = "<group>"; };
+		AA1000172C1B100100000007 /* SignatureCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureCanvasView.swift; sourceTree = "<group>"; };
+		AA1000182C1B100100000008 /* SignatureOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureOverlayView.swift; sourceTree = "<group>"; };
+		AA1000192C1B100100000009 /* PDFManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFManager.swift; sourceTree = "<group>"; };
+		AA10001A2C1B10010000000A /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		AA10001B2C1B10010000000B /* DocumentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentDetailView.swift; sourceTree = "<group>"; };
+		AA10001C2C1B10010000000C /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		AA10001D2C1B10010000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AA1000202C1B100100000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AA1000302C1B100100000000 = {
+			isa = PBXGroup;
+			children = (
+				AA1000312C1B100100000000 /* RDSScanner */,
+				AA1000382C1B100100000000 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		AA1000312C1B100100000000 /* RDSScanner */ = {
+			isa = PBXGroup;
+			children = (
+				AA1000322C1B100100000000 /* App */,
+				AA1000332C1B100100000000 /* Models */,
+				AA1000342C1B100100000000 /* Storage */,
+				AA1000352C1B100100000000 /* Scanner */,
+				AA1000362C1B100100000000 /* Signature */,
+				AA1000372C1B100100000000 /* PDF */,
+				AA1000392C1B100100000000 /* Views */,
+			);
+			path = RDSScanner;
+			sourceTree = "<group>";
+		};
+		AA1000322C1B100100000000 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				AA1000112C1B100100000001 /* RDSScannerApp.swift */,
+				AA10001D2C1B10010000000D /* Info.plist */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		AA1000332C1B100100000000 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				AA1000122C1B100100000002 /* ScannedDocument.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		AA1000342C1B100100000000 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				AA1000132C1B100100000003 /* DocumentStorageManager.swift */,
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
+		AA1000352C1B100100000000 /* Scanner */ = {
+			isa = PBXGroup;
+			children = (
+				AA1000142C1B100100000004 /* ImageProcessor.swift */,
+				AA1000152C1B100100000005 /* DocumentScannerView.swift */,
+			);
+			path = Scanner;
+			sourceTree = "<group>";
+		};
+		AA1000362C1B100100000000 /* Signature */ = {
+			isa = PBXGroup;
+			children = (
+				AA1000162C1B100100000006 /* SignatureManager.swift */,
+				AA1000172C1B100100000007 /* SignatureCanvasView.swift */,
+			);
+			path = Signature;
+			sourceTree = "<group>";
+		};
+		AA1000372C1B100100000000 /* PDF */ = {
+			isa = PBXGroup;
+			children = (
+				AA1000192C1B100100000009 /* PDFManager.swift */,
+			);
+			path = PDF;
+			sourceTree = "<group>";
+		};
+		AA1000392C1B100100000000 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				AA1000182C1B100100000008 /* SignatureOverlayView.swift */,
+				AA10001A2C1B10010000000A /* HomeView.swift */,
+				AA10001B2C1B10010000000B /* DocumentDetailView.swift */,
+				AA10001C2C1B10010000000C /* AboutView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		AA1000382C1B100100000000 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA1000102C1B100100000000 /* RDSScanner.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AA1000402C1B100100000000 /* RDSScanner */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA1000502C1B100100000000 /* Build configuration list for PBXNativeTarget "RDSScanner" */;
+			buildPhases = (
+				AA1000412C1B100100000000 /* Sources */,
+				AA1000202C1B100100000000 /* Frameworks */,
+				AA1000422C1B100100000000 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RDSScanner;
+			productName = RDSScanner;
+			productReference = AA1000102C1B100100000000 /* RDSScanner.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AA1000002C1B100100000000 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					AA1000402C1B100100000000 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = AA1000602C1B100100000000 /* Build configuration list for PBXProject "RDSScanner" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = AA1000302C1B100100000000;
+			productRefGroup = AA1000382C1B100100000000 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AA1000402C1B100100000000 /* RDSScanner */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AA1000422C1B100100000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AA1000412C1B100100000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA1000012C1B100100000001 /* RDSScannerApp.swift in Sources */,
+				AA1000022C1B100100000002 /* ScannedDocument.swift in Sources */,
+				AA1000032C1B100100000003 /* DocumentStorageManager.swift in Sources */,
+				AA1000042C1B100100000004 /* ImageProcessor.swift in Sources */,
+				AA1000052C1B100100000005 /* DocumentScannerView.swift in Sources */,
+				AA1000062C1B100100000006 /* SignatureManager.swift in Sources */,
+				AA1000072C1B100100000007 /* SignatureCanvasView.swift in Sources */,
+				AA1000082C1B100100000008 /* SignatureOverlayView.swift in Sources */,
+				AA1000092C1B100100000009 /* PDFManager.swift in Sources */,
+				AA10000A2C1B10010000000A /* HomeView.swift in Sources */,
+				AA10000B2C1B10010000000B /* DocumentDetailView.swift in Sources */,
+				AA10000C2C1B10010000000C /* AboutView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		AA1000512C1B100100000000 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RDSScanner/App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.3.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sami12901.rdsscanner;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AA1000522C1B100100000000 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RDSScanner/App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.3.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sami12901.rdsscanner;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		AA1000612C1B100100000000 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		AA1000622C1B100100000000 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AA1000502C1B100100000000 /* Build configuration list for PBXNativeTarget "RDSScanner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA1000512C1B100100000000 /* Debug */,
+				AA1000522C1B100100000000 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA1000602C1B100100000000 /* Build configuration list for PBXProject "RDSScanner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA1000612C1B100100000000 /* Debug */,
+				AA1000622C1B100100000000 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = AA1000002C1B100100000000 /* Project object */;
+}

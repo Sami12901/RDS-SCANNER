@@ -1,6 +1,7 @@
 package com.example.rdsscanner.ui.about
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -95,13 +96,18 @@ fun AboutDialog(onDismiss: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Developer Credit Badge
+                val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+
+                // Developer Credit Badge (Clickable GitHub profile)
                 Surface(
                     color = EmeraldPrimary.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.clickable {
+                        uriHandler.openUri("https://github.com/Sami12901")
+                    }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -112,7 +118,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Develop by Sami",
+                            text = "Develop by Sami (@Sami12901) ↗",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = EmeraldPrimary
@@ -120,7 +126,30 @@ fun AboutDialog(onDismiss: () -> Unit) {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // GitHub Action Button
+                androidx.compose.material3.OutlinedButton(
+                    onClick = { uriHandler.openUri("https://github.com/Sami12901/RDS-SCANNER") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Code,
+                        contentDescription = "GitHub",
+                        tint = EmeraldPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Star on GitHub (Sami12901)",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Open Source & Privacy Perks
                 Card(
@@ -157,7 +186,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Version 1.2.0 • Open Source License\nCrafted with pride by Sami",
+                    text = "Version 1.2.0 • Open Source License\nCrafted with pride by Sami\ngithub.com/Sami12901/RDS-SCANNER",
                     fontSize = 11.sp,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
