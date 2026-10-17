@@ -38,8 +38,8 @@ jobs:
       - name: Locate and Prepare APK
         run: |
           mkdir -p output_apk
-          APK_PATH=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
-          echo "Found APK at: $APK_PATH"
+          APK_PATH=$(find app/build/outputs/apk -name "*release.apk" -o -name "*debug.apk" | grep -v "unsigned" | head -n 1)
+          echo "Found Signed APK at: $APK_PATH"
           cp "$APK_PATH" output_apk/RDS-SCANNER-v1.3.0.apk
 
       - name: Upload Android APK Artifact
