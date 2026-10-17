@@ -61,26 +61,37 @@ jobs:
       - name: Select Xcode Version
         run: sudo xcode-select -s /Applications/Xcode_15.4.app || sudo xcode-select -s /Applications/Xcode.app
 
-      - name: Build iOS Xcode Project
+      - name: Build iOS Application Binary
         run: |
           cd ios/RDSScanner
+          mkdir -p build/Release-iphoneos
           xcodebuild -project RDSScanner.xcodeproj \
             -scheme RDSScanner \
             -configuration Release \
             -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
+            CONFIGURATION_BUILD_DIR="$PWD/build/Release-iphoneos" \
             clean build
 
-      - name: Package iOS Project Source & Archive
+      - name: Package .ipa (iOS Application Archive)
         run: |
+          cd ios/RDSScanner
+          mkdir -p build/Payload
+          cp -r build/Release-iphoneos/RDSScanner.app build/Payload/
+          cd build
+          zip -qr RDSScanner-v1.3.0.ipa Payload
+          cd ../../..
           mkdir -p output_ios
-          zip -r output_ios/RDSScanner-iOS-v1.3.0.zip ios/RDSScanner
+          cp ios/RDSScanner/build/RDSScanner-v1.3.0.ipa output_ios/
 
-      - name: Upload iOS Package Artifact
+      - name: Upload iOS IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-package
-          path: output_ios/RDSScanner-iOS-v1.3.0.zip
+          name: ios-ipa
+          path: output_ios/RDSScanner-v1.3.0.ipa
 
   # ==========================================
   # Job 3: Publish GitHub Release
@@ -103,19 +114,19 @@ jobs:
       - name: Download iOS Artifact
         uses: actions/download-artifact@v4
         with:
-          name: ios-package
+          name: ios-ipa
           path: release_assets
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: RDS SCANNER ${{ github.ref_name }} — Android & iOS Release
+          tag_name: ${{ github.ref_name || 'v1.3.0' }}
+          name: RDS SCANNER ${{ github.ref_name || 'v1.3.0' }} — Android APK & iOS IPA Release
           draft: false
           prerelease: false
           files: |
             release_assets/RDS-SCANNER-v1.3.0.apk
-            release_assets/RDSScanner-iOS-v1.3.0.zip
+            release_assets/RDSScanner-v1.3.0.ipa
           body: |
             ## 🚀 RDS SCANNER v1.3.0 — The Ultimate Privacy-First CamScanner Alternative
 
