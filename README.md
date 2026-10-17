@@ -21,17 +21,17 @@
 
 ---
 
-## 📥 Download RDS SCANNER (v1.3.0)
+## 📥 Download RDS SCANNER (v1.3.1)
 
 Get the latest release for your phone:
 
 <p align="center">
-  <a href="https://github.com/Sami12901/RDS-SCANNER/releases/download/v1.3.0/RDS-SCANNER-v1.3.0.apk">
-    <img src="https://img.shields.io/badge/Download_Android_APK-v1.3.0_(23.3_MB)-00A86B?style=for-the-badge&logo=android&logoColor=white" alt="Download Android APK" />
+  <a href="https://github.com/Sami12901/RDS-SCANNER/releases/download/v1.3.1/RDS-SCANNER-v1.3.1.apk">
+    <img src="https://img.shields.io/badge/Download_Android_APK-v1.3.1_(Signed_15.6_MB)-00A86B?style=for-the-badge&logo=android&logoColor=white" alt="Download Android APK" />
   </a>
   &nbsp;&nbsp;
-  <a href="https://github.com/Sami12901/RDS-SCANNER/releases/download/v1.3.0/RDSScanner-v1.3.0.ipa">
-    <img src="https://img.shields.io/badge/Download_iPhone_IPA-v1.3.0_(iOS_16+)-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download iPhone IPA" />
+  <a href="https://github.com/Sami12901/RDS-SCANNER/releases/download/v1.3.1/RDSScanner-v1.3.1.ipa">
+    <img src="https://img.shields.io/badge/Download_iPhone_IPA-v1.3.1_(iOS_16+)-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download iPhone IPA" />
   </a>
 </p>
 
